@@ -77,9 +77,7 @@ $(BUILDDIR)/%.asm: $(SRCDIR)/%$(SOURCE_EXT)
 # Compress whitespace (lines) to at most 3 in a row
 	@sed -ni '/^\s*$$/d;:b;/^\s*$$/!bn;p;n;/^\s*$$/!bn;p;n;/^\s*$$/!bn;p;:w;n;/^\s*$$/bw;bb;:n;p;n;bb' $@
 
-
-%: $(BUILDDIR)/%.asm
-	@echo "$(COLOR_CYAN)[ assembling ]$(COLOR_RESET) $@"
+%.hex: %.asm
 # NOTE:
 # AVRA is a piece of shit garbage, and most command line arguments don't work.
 # E.g. for the output file argument the source mentions 'Not implemented ? B.A.'
@@ -91,11 +89,16 @@ $(BUILDDIR)/%.asm: $(SRCDIR)/%$(SOURCE_EXT)
 #   'e', eepfile
 #
 # So we need to move the output file to the destination ourselves...
+	@echo "$(COLOR_CYAN)[ assembling ]$(COLOR_RESET) $<"
 	@$(ASSEMBLER) $(ASMFLAGS) $^ 2>$<.err | tail -n +13
 	@cat $<.err | sed -e 's:^:$(COLOR_RED):' -e 's:$$:$(COLOR_RESET):' | grep -v 'PRAGMA directives currently ignored' || true
-	@cp $(BUILDDIR)/$*.hex $@
 
-# upload
+%: $(BUILDDIR)/%.hex
+	@echo "$(COLOR_CYAN)[ hex2bin ]$(COLOR_RESET) $<"
+	@objcopy --input-target ihex --output-target binary $< $@
+
+upload:
+	@echo "$(COLOR_CYAN)[ uploading ]$(COLOR_RESET) $<"
 # avrdude -p m168 -P /dev/ttyUSB0 -c stk500v1 -b 19200 -F -u -U flash:w:<YOUR FILE>.s.hex
 
 clean:
