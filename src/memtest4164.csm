@@ -1,0 +1,16 @@
+.nolist                  // We don't want to actually include defs in our listing file.
+.include "m328pdef.inc"  // defines all the pins on the ATMega328 so we can
+                         // use them by their names rather than addresses (not fun).
+.list                    // We DO want to include the following code in our listing ;D
+
+
+#include "utility_macros.csm"
+#include "utility_functions.csm"
+
+init:
+	clear_all_registers()
+
+
+
+error_trap:
+	rjmp error_trap

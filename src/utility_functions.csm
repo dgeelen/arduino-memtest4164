@@ -1,0 +1,22 @@
+/******************************************************************************
+
+
+
+ ******************************************************************************/
+#pragma once
+
+#include "utility_macros.csm"
+
+/**
+ * loads zeros into every register
+ */
+#define clear_all_registers() DEF_LABELED( clear_all_registers,               $\
+  ldi   ZH, 0x20                                                              $\
+  clr   ZL                                                                    $\
+  clr   YH                                                                    $\
+  clr   YL                                                                    $\
+  st    Y+, ZL                                                                $\
+  cpse  YL, ZH                                                                $\
+  rjmp  clear_all_registers                                                   $\
+  ldi zl, 0                                                                   $\
+)

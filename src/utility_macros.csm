@@ -1,0 +1,393 @@
+/******************************************************************************
+
+   This file contains a collection of convenience functions for working with
+   assembly level constructs. It also provides a large number of support
+   macros which may be of use.
+
+   Notes:
+
+   The '$' symbol should mark the end of a logical line (but AVRA doesn't seem
+   to support this).
+     -- http://lists.gnu.org/archive/html/avr-gcc-list/2003-09/msg00037.html
+
+ ******************************************************************************/
+#pragma once
+
+#include <boost/preprocessor/cat.hpp>
+#include <boost/preprocessor/seq/cat.hpp>
+#include <boost/preprocessor/seq/pop_back.hpp>
+#include <boost/preprocessor/seq/seq.hpp>
+#include <boost/preprocessor/variadic/to_seq.hpp>
+#include <boost/preprocessor/seq/to_tuple.hpp>
+#include <boost/preprocessor/facilities/empty.hpp>
+#include <boost/preprocessor/facilities/identity.hpp>
+#include <boost/preprocessor/variadic/elem.hpp>
+#include <boost/preprocessor/stringize.hpp>
+
+
+
+/**
+ * Some debug helpers
+ */
+#define FIRST( X, ... )     [[[ 1 | X ]]]
+#define SECOND( X, Y, ... ) [[[ 2 | Y ]]]
+
+
+
+/**
+ * Forces a error to occur during macro evaluation
+ *
+ * Compliant compilers will complain about a macro call without an argument for
+ * the variadic argument, while other compilers should simply show the error
+ * text using a pragma (error) message.
+ */
+#define FORCE_MACRO_ERROR_(x, ...)   _Pragma( BOOST_PP_STRINGIZE( GCC error( #x ) ) )
+#define FORCE_MACRO_ERROR(...)       FORCE_MACRO_ERROR_( (__VA_ARGS__) )
+
+
+
+/**
+ * Concatenates any number of arguments (up-to 64)
+ */
+#define CAT_N_( \
+  A00, A01, A02, A03, A04, A05, A06, A07, \
+  A08, A09, A0A, A0B, A0C, A0D, A0E, A0F, \
+  A10, A11, A12, A13, A14, A15, A16, A17, \
+  A18, A19, A1A, A1B, A1C, A1D, A1E, A1F, \
+  A20, A21, A22, A23, A24, A25, A26, A27, \
+  A28, A29, A2A, A2B, A2C, A2D, A2E, A2F, \
+  A30, A31, A32, A33, A34, A35, A36, A37, \
+  A38, A39, A3A, A3B, A3C, A3D, A3E, A3F, \
+  ... \
+) \
+  A00 ## A01 ## A02 ## A03 ## A04 ## A05 ## A06 ## A07 ## \
+  A08 ## A09 ## A0A ## A0B ## A0C ## A0D ## A0E ## A0F ## \
+  A10 ## A11 ## A12 ## A13 ## A14 ## A15 ## A16 ## A17 ## \
+  A18 ## A19 ## A1A ## A1B ## A1C ## A1D ## A1E ## A1F ## \
+  A20 ## A21 ## A22 ## A23 ## A24 ## A25 ## A26 ## A27 ## \
+  A28 ## A29 ## A2A ## A2B ## A2C ## A2D ## A2E ## A2F ## \
+  A30 ## A31 ## A32 ## A33 ## A34 ## A35 ## A36 ## A37 ## \
+  A38 ## A39 ## A3A ## A3B ## A3C ## A3D ## A3E ## A3F    \
+// CAT_N_
+#define CAT_N( ... ) CALL( CAT_N_, __VA_ARGS__,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,, )
+
+
+
+/**
+ * Detect whether a set of arguments contains a comma or not
+ * Adapted from https://gustedt.wordpress.com/2010/06/08/detect-empty-macro-arguments/
+ *
+ * Limited to 64 arguments due to BOOST_PP_LIMIT_VARIADIC
+ * __VA_ARGS__ will sit at position 0, and push the remaining 63 arguments one
+ * to the left for every comma it contains. So only if there are no commas in
+ * __VA_ARGS__ will we return the last, 64th, element '0'.
+ */
+#define HAS_COMMA(...)                                                         \
+  BOOST_PP_VARIADIC_ELEM( 63,                                                  \
+    __VA_ARGS__,                                                               \
+/* 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F */                           \
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,                             \
+   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,                             \
+   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,                             \
+   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0                              \
+  ) // HAS_COMMA
+
+
+
+/**
+ * Macro to detect whether an argument is (wholly) wrapped in parenthesis.
+ */
+#define HAS_PARENTHESES_01(...)  ,
+#define HAS_PARENTHESES_(x, ...) HAS_COMMA( HAS_PARENTHESES_01 x )
+#define HAS_PARENTHESES(...)                                                   \
+  HAS_COMMA(                                                                   \
+    BOOST_PP_CAT(                                                              \
+      BOOST_PP_CAT(                                                            \
+        HAS_PARENTHESES_,                                                      \
+        HAS_COMMA(__VA_ARGS__)                                                 \
+      ),                                                                       \
+      HAS_PARENTHESES_(                                                        \
+        __VA_ARGS__,                                                           \
+        dummy                                                                  \
+      )                                                                        \
+    )()                                                                        \
+  ) // HAS_PARENTHESES
+
+
+
+/**
+ * Removes parentheses around an argument recursively.
+ * E.g. REMOVE_PARENTHESES( (((x,y),z)) ) evaluates to '(x,y),z'
+ *
+ * NOTE:
+ * Supports up-to a maximum of 64 layers of nested parentheses.
+ */
+#define REMOVE_PARENTHESES_XX(...)   FORCE_MACRO_ERROR( MAXIMUM ITERATION DEPTH EXCEEDED )
+#define REMOVE_PARENTHESES_00(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_XX, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_01(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_00, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_02(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_01, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_03(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_02, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_04(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_03, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_05(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_04, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_06(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_05, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_07(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_06, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_08(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_07, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_09(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_08, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_10(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_09, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_11(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_10, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_12(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_11, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_13(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_12, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_14(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_13, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_15(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_14, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_16(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_15, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_17(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_16, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_18(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_17, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_19(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_18, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_20(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_19, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_21(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_20, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_22(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_21, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_23(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_22, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_24(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_23, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_25(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_24, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_26(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_25, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_27(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_26, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_28(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_27, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_29(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_28, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_30(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_29, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_31(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_30, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_32(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_31, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_33(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_32, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_34(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_33, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_35(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_34, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_36(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_35, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_37(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_36, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_38(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_37, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_39(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_38, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_40(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_39, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_41(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_40, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_42(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_41, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_43(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_42, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_44(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_43, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_45(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_44, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_46(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_45, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_47(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_46, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_48(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_47, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_49(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_48, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_50(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_49, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_51(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_50, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_52(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_51, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_53(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_52, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_54(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_53, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_55(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_54, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_56(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_55, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_57(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_56, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_58(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_57, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_59(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_58, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_60(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_59, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_61(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_60, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_62(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_61, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES_63(...)   BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESES_62, BOOST_PP_EMPTY() ) __VA_ARGS__
+#define REMOVE_PARENTHESES(...)      REMOVE_PARENTHESES_63( __VA_ARGS__ )
+
+
+
+/**
+ * Removes a single layer of parentheses.
+ * E.g. REMOVE_PARENTHESIS( (((x,y),z)) ) evaluates to '((x,y),z)'
+ */
+#define REMOVE_PARENTHESIS_(...) __VA_ARGS__
+#define REMOVE_PARENTHESIS(...)  BOOST_PP_IF( HAS_PARENTHESES(__VA_ARGS__), REMOVE_PARENTHESIS_, BOOST_PP_EMPTY() ) __VA_ARGS__
+
+
+
+#if 0
+#define III_ARG16(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, ...) _15
+#define IIIHAS_COMMA(...) III_ARG16(__VA_ARGS__, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+#define III_TRIGGER_PARENTHESIS_(...) ,
+
+#define IIIISEMPTY(...)                                                    \
+III_ISEMPTY(                                                               \
+          /* test if there is just one argument, eventually an empty    \
+             one */                                                     \
+          HAS_COMMA(__VA_ARGS__),                                       \
+          /* test if _TRIGGER_PARENTHESIS_ together with the argument   \
+             adds a comma */                                            \
+          HAS_COMMA(III_TRIGGER_PARENTHESIS_ __VA_ARGS__),                 \
+          /* test if the argument together with a parenthesis           \
+             adds a comma */                                            \
+          HAS_COMMA(__VA_ARGS__ (/*empty*/)),                           \
+          /* test if placing it between _TRIGGER_PARENTHESIS_ and the   \
+             parenthesis adds a comma */                                \
+          HAS_COMMA(III_TRIGGER_PARENTHESIS_ __VA_ARGS__ (/*empty*/))      \
+          )
+
+#define IIIPASTE5(_0, _1, _2, _3, _4) _0 ## _1 ## _2 ## _3 ## _4
+#define III_ISEMPTY(_0, _1, _2, _3) HAS_COMMA(IIIPASTE5(III_IS_EMPTY_CASE_, _0, _1, _2, _3))
+#define III_IS_EMPTY_CASE_0001 ,
+#endif
+
+
+
+/**
+ * Detect whether a (set of) arguments expands to the empty argument.
+ *
+ * Note:
+ *  IS_EMPTY will not correctly detect empty-ness for a function-like macro if
+ *  only its name is passed. I.e. the following will not give the correct
+ *  answer:
+ *  ---8<---------
+ *  #define FOO() ...
+ *  IS_EMPTY( FOO )         // expands to 1, not 0
+ *  --->8---------
+ *
+ *  This appears to be a fundamental problem, with no known solution. See e.g.
+ *  the discussion on boost's implementation of IS_EMPTY at
+ *  http://boost.2283326.n4.nabble.com/problem-with-BOOST-PP-IS-EMPTY-macro-td2603454.html
+ *
+ *
+ *  Currently there are four cases tested (see below for details on what each
+ *  case detects). In the end, we are looking for the case '0001', which means
+ *  that:
+ *   - The argument by itself does not expand to a comma,
+ *   - It is not something wrapped in (or starting with) parenthesis,
+ *   - It is not a function-like macro-name expanding to something containing a
+ *     comma (but it might still expand to something without commas),
+ *   - It does allow IS_EMPTY_0001 to expand, so it is either empty or it
+ *     expands to something containing parenthesis,
+ *  Combing this we know that the only two options for the argument are either
+ *  that it is empty, or that it is a function-like macro name.
+ *  The latter is not permitted since we cannot detect this case, as per the
+ *  above discussion.
+ *
+ *  Cases known to still fail:
+ *   - Sufficiently deeply nested expressions of the form "(x),y", where nesting
+ *     occurs within x. E.g. "(((a,b),c),d)" fails with an attempt to paste a
+ *     parenthesis.
+ *     Probably the only way to work around this is to write a dedicated
+ *     unwrapper macro for this type of nesting, up-to some maximum depth
+ *     (recursion sucks!)
+ *
+ * Adapted from https://gustedt.wordpress.com/2010/06/08/detect-empty-macro-arguments/
+ */
+#define IS_EMPTY_0001(...) ,
+#define IS_EMPTY(...)                                                          \
+  HAS_COMMA(                                                                   \
+    BOOST_PP_SEQ_CAT(                                                          \
+      /**                                                                    */\
+      /* Base name of result, the output of the below tests will be appended */\
+      /* to this, which produces e.g. 'IS_EMPTY_0101'.                       */\
+      ( IS_EMPTY_ )                                                            \
+      /**                                                                    */\
+      /* Returns 0 for either a single value or the empty argument, 1        */\
+      /* otherwise.                                                          */\
+      ( HAS_COMMA( __VA_ARGS__ ) )                                             \
+      /**                                                                    */\
+      /* Returns 1 if __VA_ARGS__ is something which starts with a '(' and   */\
+      /* contains a ')', i.e. if it might be considered a set of arguments.  */\
+      ( HAS_COMMA( IS_EMPTY_0001 __VA_ARGS__ ) )                               \
+      /**                                                                    */\
+      /* Returns 1 if __VA_ARGS__ is itself a function-like macro which      */\
+      /* expands to something containing a comma                             */\
+      ( HAS_COMMA( __VA_ARGS__() ) )                                           \
+      /**                                                                    */\
+      /* Returns 1 if either:                                                */\
+      /*  1) __VA_ARGS__ expands to something containing a comma,            */\
+      /*  2) __VA_ARGS__() expands to something containing a comma,          */\
+      /*  3) __VA_ARGS__ expands to nothing (triggering IS_EMPTY_0001(),     */\
+      /*     which expands to a comma)                                       */\
+      /*  4) __VA_ARGS__ expands to something starting with parenthesis,     */\
+      /*     allowing IS_EMPTY_0001 to trigger.                              */\
+      /*                                                                     */\
+      /* The complex structure with calling remove parentheses on the first  */\
+      /* argument is an attempt to deal with arguments of the form           */\
+      /* '(x,y),z'. Currently this provides only rudimentary protection      */\
+      /* against such arguments.                                             */\
+      (                                                                        \
+        HAS_COMMA(                                                             \
+          CAT_N(                                                               \
+            IS_EMPTY,                                                          \
+            REMOVE_PARENTHESES( BOOST_PP_VARIADIC_ELEM( 0, __VA_ARGS__ ) ),    \
+            _,                                                                 \
+            0001                                                               \
+          )()                                                                  \
+        )                                                                      \
+      )                                                                        \
+   )()                                                                         \
+  ) // IS_EMPTY
+
+
+
+/**
+ * Call a function-like macro by name, optionally passing a parameter list
+ */
+#define CALL( F, ... ) F( __VA_ARGS__ )
+
+
+
+/**
+ * When passing e.g. __VA_ARGS__ through some BOOST_PP function (such as
+ * BOOST_PP_IF), the expanded __VA_ARGS__ will cause a wrong number of arguments
+ * to be passed to BOOST_PP_IF. To prevent this, you can "protect" the list with
+ * these macros, which simply wrap the list in a pair of parenthesis.
+ */
+#define PROTECT(...) (__VA_ARGS__)
+#define UNPROTECT_(...) __VA_ARGS__
+#define UNPROTECT(...) UNPROTECT_ __VA_ARGS__
+
+
+
+/**
+ * Returns the first element of a variadic argument list
+ */
+#define VARIADIC_HEAD_( first, ... ) first
+#define VARIADIC_HEAD( ... ) VARIADIC_HEAD_( __VA_ARGS__, dummy )
+
+
+
+/**
+ * Returns all but the first element of a variadic argument list
+ */
+//*
+#define VARIADIC_TAIL_( ... )
+#define VARIADIC_TAIL__( first, ... ) __VA_ARGS__
+#define VARIADIC_TAIL( ... )                                                   \
+  BOOST_PP_IF(                                                                 \
+    BOOST_PP_DEC( BOOST_PP_VARIADIC_SIZE( __VA_ARGS__ ) ),                     \
+    VARIADIC_TAIL__,                                                           \
+    VARIADIC_TAIL_                                                             \
+  )( __VA_ARGS__ )                                                             \
+  // VARIADIC_TAIL
+
+
+
+/**
+ * Surround a macro definition with markers
+ * /
+#define DEF_MARKER_( name, ... )                                               $\
+  ; ---[ name ]------------------------------------------------                \
+  UNPROTECT(                                                                   \
+    BOOST_PP_IF(                                                             \
+      BOOST_PP_VARIADIC_SIZE( __VA_ARGS__ ),                   \
+      PROTECT(__VA_ARGS__),                                                    \
+      PROTECT($ ; (empty definition) $)                                        \
+    )                                                                          \
+  ) [__VA_ARGS__|BOOST_PP_VARIADIC_SIZE( __VA_ARGS__ )]                         \
+  ; -----------------------------------------------[ __FILE__:__LINE__ ]---   $\
+  // DEF_MARKER_
+  */
+#define DEF_MARKER_( name, ... )                                              $\
+  ; ---[ name ]------------------------------------------------                \
+  BOOST_PP_IF( IS_EMPTY( __VA_ARGS__ ),$ ; (no code)$, )__VA_ARGS__            \
+  ; -----------------------------------------------[ __FILE__:__LINE__ ]---   $\
+  // DEF_MARKER_
+#define DEF_MARKER(...) DEF_MARKER_( VARIADIC_HEAD( __VA_ARGS__ ), VARIADIC_TAIL( __VA_ARGS__ ) )
+
+
+
+/**
+ * Define a macro with a prefixed label. This way your code has a label which
+ * can e.g. be jumped to.
+ */
+#define DEF_LABELED_0( name, ... )   DEF_MARKER( name, $ name: __VA_ARGS__ )
+#define DEF_LABELED_1( name      )   DEF_MARKER( name, $ name: ; note: label only$ )
+#define DEF_LABELED( ... )          CAT_N( DEF_LABELED_, IS_EMPTY( VARIADIC_TAIL( __VA_ARGS__ ) ) )( __VA_ARGS__ )
