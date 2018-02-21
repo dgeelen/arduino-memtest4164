@@ -97,7 +97,11 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 # So we need to move the output file to the destination ourselves...
 	@echo "$(COLOR_CYAN)[ assembling ]$(COLOR_RESET) $<"
 	@$(ASSEMBLER) $(ASMFLAGS) $^ 2>$<.err | tail -n +13
-	@cat $<.err | sed -e 's:^:$(COLOR_RED):' -e 's:$$:$(COLOR_RESET):' | grep -v 'PRAGMA directives currently ignored' || true
+# We invert the result of grep in the following expression so that having any
+# lines in stderr other than the PRAGMAs cause Make to exit with an error.
+	@sed -e 's:^:$(COLOR_RED):' -e 's:$$:$(COLOR_RESET):' $<.err \
+		| grep -v 'PRAGMA directives currently ignored' \
+		; test $$? -eq 1
 
 %: $(BUILDDIR)/%.hex
 	@echo "$(COLOR_CYAN)[ hex2bin ]$(COLOR_RESET) $<"
