@@ -67,7 +67,13 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 	@rm -f $@_
 
 
-$(BUILDDIR)/%.asm: $(SRCDIR)/%$(SOURCE_EXT)
+# The dependency rules generated directly above dictate the dependencies for
+# .asm files, i.e. which .csm files are required for generating which .asm
+# file. This information is generated for each possible .asm file (even though
+# we are only going to generate one). Therefor we only need the recipe here,
+# the correct set of dependencies (with the correct file at the front of the
+# list) is automatically selected.
+%.asm:
 	@echo "$(COLOR_CYAN)[ preprocessing ]$(COLOR_RESET) $<"
 	@$(CXX) $(CFLAGS) -x c++ -E -o $@ $<
 # AVR assembler should support '$' as logical line-end, but AVRA does not
