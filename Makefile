@@ -107,9 +107,20 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) Creating binary $<"
 	@objcopy --input-target ihex --output-target binary $< $@
 
-upload:
-	@echo "$(COLOR_CYAN)[ uploading ]$(COLOR_RESET) $<"
-# avrdude -p m168 -P /dev/ttyUSB0 -c stk500v1 -b 19200 -F -u -U flash:w:<YOUR FILE>.s.hex
+listen: discover_tty
+	@echo "$(COLOR_CYAN)[ running   ]$(COLOR_RESET) Listening on tty..."
+	tail -f $(ARDUINO_TTY)
+
+
+discover_tty:
+	@echo "$(COLOR_CYAN)[ uploading ]$(COLOR_RESET) Scanning for tty..."
+	@$(eval ARDUINO_TTY=$(shell lsusb | grep Arduino | sed -e 's:Bus 0*:/dev/ttyACM:' -e 's: Device.*::'))
+	@echo "$(ARDUINO_TTY)" | grep "ttyACM[5-9]*" >/dev/null || (echo "${COLOR_RED}Error: tty not found. Is your arduino connected?${COLOR_RESET}" && exit 1)
+	@echo "$(COLOR_CYAN)[ uploading ]$(COLOR_RESET) Found tty: $(ARDUINO_TTY)..."
+
+upload: all discover_tty
+	@echo "$(COLOR_CYAN)[ uploading ]$(COLOR_RESET) Running AVRDude"
+	@avrdude -p m328p -c arduino -P $(ARDUINO_TTY) -b 115200 -D -Uflash:w:$(TARGETS):r
 
 clean:
 	@echo "$(COLOR_CYAN)[ cleaning ]$(COLOR_RESET)"
