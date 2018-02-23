@@ -53,11 +53,11 @@ endif
 .PHONY: all clean cleaner
 .DEFAULT: all
 all: $(TARGETS)
-	@echo "$(COLOR_CYAN)[ done ]$(COLOR_RESET)"
+	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) Build complete"
 
 # http://sunsite.ualberta.ca/Documentation/Gnu/make-3.79/html_chapter/make_4.html
 $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
-	@echo "$(COLOR_CYAN)[ scanning preprocess-time dependencies ]$(COLOR_RESET) $<"
+	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) scanning preprocess-time dependencies for $<"
 	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.asm"
 # Next line might not be needed and lead to excessively long lines:
 	@sed -Ee 's: *$$::' -e ':\\$$:;N;s:\\\n: :' -e 's: +: :g' -i $@
@@ -74,7 +74,7 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 # the correct set of dependencies (with the correct file at the front of the
 # list) is automatically selected.
 %.asm:
-	@echo "$(COLOR_CYAN)[ preprocessing ]$(COLOR_RESET) $<"
+	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) preprocessing $<"
 	@$(CXX) $(CFLAGS) -x c++ -E -o $@ $<
 # AVR assembler should support '$' as logical line-end, but AVRA does not
 	@sed -i "s:\\$$:\n:g" $@
@@ -95,7 +95,7 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 #   'e', eepfile
 #
 # So we need to move the output file to the destination ourselves...
-	@echo "$(COLOR_CYAN)[ assembling ]$(COLOR_RESET) $<"
+	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)  assembling $<"
 	@$(ASSEMBLER) $(ASMFLAGS) $^ 2>$<.err | tail -n +13
 # We invert the result of grep in the following expression so that having any
 # lines in stderr other than the PRAGMAs cause Make to exit with an error.
@@ -104,7 +104,7 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 		; test $$? -eq 1
 
 %: $(BUILDDIR)/%.hex
-	@echo "$(COLOR_CYAN)[ hex2bin ]$(COLOR_RESET) $<"
+	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) Creating binary $<"
 	@objcopy --input-target ihex --output-target binary $< $@
 
 upload:
