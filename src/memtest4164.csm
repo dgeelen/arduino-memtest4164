@@ -16,6 +16,14 @@ init:
 
 	clear_all_registers()
 
+	; r00 is always 0x00
+	; r01 is always 0x01
+	; r02 is always 0xff
+	eor r00, r00
+	mov r01, r00
+	mov r02, r00
+	inc r01
+	dec r02
 
 
 error_trap:
