@@ -8,6 +8,12 @@
 #include "utility_functions.csm"
 
 init:
+	// set up the stack
+	ldi r16, low(RAMEND)
+	out SPL, r16
+	ldi r16, high(RAMEND)
+	out SPH, r16
+
 	clear_all_registers()
 
 
