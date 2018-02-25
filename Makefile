@@ -31,6 +31,7 @@ COLOR_YELLOW=$(shell echo -e '\033[01;33m')
 OBJ_FILES    := $(SOURCE_FILES:%$(SOURCE_EXT)=$(BUILDDIR)/%.o)
 DEP_FILES    := $(SOURCE_FILES:%$(SOURCE_EXT)=$(DEPDIR)/%.d)
 SOURCE_FILES := $(SOURCE_FILES:%$(SOURCE_EXT)=$(SRCDIR)/%$(SOURCE_EXT))
+TARGETS      := $(TARGETS:%=%.bin)
 
 $(shell mkdir -p $(BUILDDIR))
 $(shell mkdir -p $(DEPDIR))
@@ -58,7 +59,7 @@ all: $(TARGETS)
 # http://sunsite.ualberta.ca/Documentation/Gnu/make-3.79/html_chapter/make_4.html
 $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) scanning preprocess-time dependencies for $<"
-	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.asm"
+	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.pp_asm"
 # Next line might not be needed and lead to excessively long lines:
 	@sed -Ee 's: *$$::' -e ':\\$$:;N;s:\\\n: :' -e 's: +: :g' -i $@
 # next line from http://make.paulandlesley.org/autodep.html
@@ -68,13 +69,13 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 
 
 # The dependency rules generated directly above dictate the dependencies for
-# .asm files, i.e. which .csm files are required for generating which .asm
-# file. This information is generated for each possible .asm file (even though
+# .pp_asm files, i.e. which .csm files are required for generating which .pp_asm
+# file. This information is generated for each possible .pp_asm file (even though
 # we are only going to generate one). Therefor we only need the recipe here,
 # the correct set of dependencies (with the correct file at the front of the
 # list) is automatically selected.
-%.asm:
-	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) preprocessing $<"
+%.pp_asm:
+	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) preprocessing $< / $@"
 	@$(CXX) $(CFLAGS) -x c++ -E -o $@ $<
 # AVR assembler should support '$' as logical line-end, but AVRA does not
 	@sed -i "s:\\$$:\n:g" $@
@@ -83,7 +84,7 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 # Compress whitespace (lines) to at most 3 in a row
 	@sed -ni '/^\s*$$/d;:b;/^\s*$$/!bn;p;n;/^\s*$$/!bn;p;n;/^\s*$$/!bn;p;:w;n;/^\s*$$/bw;bb;:n;p;n;bb' $@
 
-%.hex: %.asm
+%.hex: %.pp_asm
 # NOTE:
 # AVRA is a piece of shit garbage, and most command line arguments don't work.
 # E.g. for the output file argument the source mentions 'Not implemented ? B.A.'
@@ -102,10 +103,18 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 	@sed -e 's:^:$(COLOR_RED):' -e 's:$$:$(COLOR_RESET):' $<.err \
 		| grep -v 'PRAGMA directives currently ignored' \
 		; test $$? -eq 1
+# Rename output (see comment above)
+	@mv $<.hex $@
 
-%: $(BUILDDIR)/%.hex
+%.bin: $(BUILDDIR)/%.hex
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) Creating binary $<"
 	@objcopy --input-target ihex --output-target binary $< $@
+
+%.asm: %.bin
+	@echo "$(COLOR_CYAN)[ disasm    ]$(COLOR_RESET) Disassembling $<..."
+	@avr-objdump -zD --prefix-address --show-raw-insn --insn-width 4 -b binary -m avr $< > $@
+
+disassembly: $(TARGETS:.bin=.asm)
 
 listen: discover_tty
 	@echo "$(COLOR_CYAN)[ running   ]$(COLOR_RESET) Listening on tty..."
