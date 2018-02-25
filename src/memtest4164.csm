@@ -7,6 +7,9 @@
 #include "utility_macros.csm"
 #include "utility_functions.csm"
 
+.org 0x0000 // Reset
+	jmp init
+
 init:
 	// set up the stack
 	ldi r16, low(RAMEND)
