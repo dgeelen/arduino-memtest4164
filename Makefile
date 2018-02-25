@@ -31,7 +31,7 @@ COLOR_YELLOW=$(shell echo -e '\033[01;33m')
 OBJ_FILES    := $(SOURCE_FILES:%$(SOURCE_EXT)=$(BUILDDIR)/%.o)
 DEP_FILES    := $(SOURCE_FILES:%$(SOURCE_EXT)=$(DEPDIR)/%.d)
 SOURCE_FILES := $(SOURCE_FILES:%$(SOURCE_EXT)=$(SRCDIR)/%$(SOURCE_EXT))
-TARGETS      := $(TARGETS:%=%.bin)
+TARGETS      := $(TARGETS:%=$(BUILDDIR)/%.bin)
 
 $(shell mkdir -p $(BUILDDIR))
 $(shell mkdir -p $(DEPDIR))
@@ -106,7 +106,7 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 # Rename output (see comment above)
 	@mv $<.hex $@
 
-%.bin: $(BUILDDIR)/%.hex
+%.bin: %.hex
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) Creating binary $<"
 	@objcopy --input-target ihex --output-target binary $< $@
 
