@@ -116,18 +116,18 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 
 disassembly: $(TARGETS:.bin=.asm)
 
-listen: discover_tty
+listen: tty_discover
 	@echo "$(COLOR_CYAN)[ running   ]$(COLOR_RESET) Listening on tty..."
 	tail -f $(ARDUINO_TTY)
 
 
-discover_tty:
+tty_discover:
 	@echo "$(COLOR_CYAN)[ uploading ]$(COLOR_RESET) Scanning for tty..."
 	@$(eval ARDUINO_TTY=$(shell lsusb | grep Arduino | sed -e 's:Bus 0*:/dev/ttyACM:' -e 's: Device.*::'))
 	@echo "$(ARDUINO_TTY)" | grep "ttyACM[5-9]*" >/dev/null || (echo "${COLOR_RED}Error: tty not found. Is your arduino connected?${COLOR_RESET}" && exit 1)
 	@echo "$(COLOR_CYAN)[ uploading ]$(COLOR_RESET) Found tty: $(ARDUINO_TTY)..."
 
-upload: all discover_tty
+upload: all tty_discover
 	@echo "$(COLOR_CYAN)[ uploading ]$(COLOR_RESET) Running AVRDude"
 	@avrdude -p m328p -c arduino -P $(ARDUINO_TTY) -b 115200 -D -Uflash:w:$(TARGETS):r
 
