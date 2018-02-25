@@ -2,8 +2,8 @@
 ##  Where to find the targets's sources  ##
 ###########################################
 SRCDIR     := src
-DEPDIR     := .deps
 BUILDDIR   := build
+DEPDIR     := $(BUILDDIR)/.deps
 SOURCE_EXT  = .csm
 HEADER_EXT  = .inc
 
