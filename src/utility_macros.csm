@@ -17,6 +17,7 @@
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/facilities/identity.hpp>
+#include <boost/preprocessor/logical/compl.hpp>
 #include <boost/preprocessor/seq/cat.hpp>
 #include <boost/preprocessor/seq/pop_back.hpp>
 #include <boost/preprocessor/seq/seq.hpp>
@@ -85,6 +86,30 @@
 	19, 18, 17, 16, 15, 14, 13, 12, 11, 10,           \
 	 9,  8,  7,  6,  5,  4,  3,  2, BOOST_PP_IIF(IS_EMPTY(__VA_ARGS__), 0, 1)  \
 ) // ARG_COUNT
+
+
+/**
+ * Determines whether the given input number is even or not (up-to 64).
+ *
+ * Returns 1 for even numbers, 0 for odd numbers.
+ */
+#define IS_EVEN(x) BOOST_PP_VARIADIC_ELEM( x,       \
+	 1,  0,  1,  0,  1,  0,  1,  0,  1, 0,            \
+	 1,  0,  1,  0,  1,  0,  1,  0,  1, 0,            \
+	 1,  0,  1,  0,  1,  0,  1,  0,  1, 0,            \
+	 1,  0,  1,  0,  1,  0,  1,  0,  1, 0,            \
+	 1,  0,  1,  0,  1,  0,  1,  0,  1, 0,            \
+	 1,  0,  0,  1,                                   \
+) // IS_EVEN
+
+
+/**
+ * Determines whether the given input number is odd or not (up-to 64).
+ *
+ * Returns 1 for odd numbers, 0 for even numbers.
+ */
+#define IS_ODD(x) BOOST_PP_COMPL(IS_EVEN(x))
+
 
 
 /**
