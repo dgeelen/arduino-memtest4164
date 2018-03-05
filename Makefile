@@ -76,7 +76,7 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 # list) is automatically selected.
 %.pp_asm:
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET) preprocessing $< / $@"
-	@$(CXX) $(CFLAGS) -x c++ -E -o $@ $<
+	@$(CXX) $(CFLAGS) -x c++ -std=c++17 -E -o $@ $<
 # AVR assembler should support '$' as logical line-end, but AVRA does not
 	@sed -i "s:\\$$:\n:g" $@
 # remove comments (lines starting with #)
