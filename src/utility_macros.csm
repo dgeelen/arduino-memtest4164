@@ -14,16 +14,15 @@
 #pragma once
 
 #include <boost/preprocessor/cat.hpp>
+#include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/facilities/empty.hpp>
+#include <boost/preprocessor/facilities/identity.hpp>
 #include <boost/preprocessor/seq/cat.hpp>
 #include <boost/preprocessor/seq/pop_back.hpp>
 #include <boost/preprocessor/seq/seq.hpp>
-#include <boost/preprocessor/variadic/to_seq.hpp>
 #include <boost/preprocessor/seq/to_tuple.hpp>
-#include <boost/preprocessor/facilities/empty.hpp>
-#include <boost/preprocessor/facilities/identity.hpp>
+#include <boost/preprocessor/variadic/to_seq.hpp>
 #include <boost/preprocessor/variadic/elem.hpp>
-#include <boost/preprocessor/stringize.hpp>
-
 
 
 /**
