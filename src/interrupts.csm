@@ -1,0 +1,110 @@
+/******************************************************************************
+
+	Facilities for hooking the various interrupts on the Arduino
+
+ ******************************************************************************/
+#pragma once
+
+#include "utility_macros.csm"
+
+
+#define ISR_RESET         0x0000   // External Pin, Power-on Reset, Brown-out Reset and Watchdog System Reset
+#define ISR_INT0          0x0001   // External Interrupt Request 0
+#define ISR_INT1          0x0002   // External Interrupt Request 1
+#define ISR_PCINT0        0x0003   // Pin Change Interrupt Request 0
+#define ISR_PCINT1        0x0004   // Pin Change Interrupt Request 1
+#define ISR_PCINT2        0x0005   // Pin Change Interrupt Request 2
+#define ISR_WDT           0x0006   // Watchdog Time-out Interrupt
+#define ISR_TIMER2_COMPA  0x0007   // Timer/Counter2 Compare Match A
+#define ISR_TIMER2_COMPB  0x0008   // Timer/Counter2 Compare Match B
+#define ISR_TIMER2_OVF    0x0009   // Timer/Counter2 Overflow
+#define ISR_TIMER1_CAPT   0x000a   // Timer/Counter1 Capture Event
+#define ISR_TIMER1_COMPA  0x000b   // Timer/Counter1 Compare Match A
+#define ISR_TIMER1_COMPB  0x000c   // Timer/Coutner1 Compare Match B
+#define ISR_TIMER1_OVF    0x000d   // Timer/Counter1 Overflow
+#define ISR_TIMER0_COMPA  0x000e   // Timer/Counter0 Compare Match A
+#define ISR_TIMER0_COMPB  0x000f   // Timer/Counter0 Compare Match B
+#define ISR_TIMER0_OVF    0x0010   // Timer/Counter0 Overflow
+#define ISR_SPI_STC       0x0011   // SPI Serial Transfer Complete
+#define ISR_USART_RX      0x0012   // USART Rx Complete
+#define ISR_USART_UDRE    0x0013   // USART, Data Register Empty
+#define ISR_USART_TX      0x0014   // USART, Tx Complete
+#define ISR_ADC           0x0015   // ADC Conversion Complete
+#define ISR_EE_READY      0x0016   // EEPROM Ready
+#define ISR_ANALOG_COMP   0x0017   // Analog Comparator
+#define ISR_TWI           0x0018   // 2-wire Serial Interface
+#define ISR_SPM_READY     0x0019   // Store Program Memory Ready
+// Sentinel, one-past-the-end
+#define ISR_VECTOR_COUNT  0x0020
+
+
+#if 0
+	// for smaller AVR cpu?
+	#define ISR_SET_ORG_FOR_IVT_ENTRY(x) .org (x)
+#else
+	// ATMega168/328
+	#define ISR_SET_ORG_FOR_IVT_ENTRY(x) .org (2*(x))
+#endif
+
+#if 0
+	// for smaller AVR cpu?
+	#define ISR_JMP_TO_HANDLER(x) rjmp x
+#else
+	// ATMega168/328
+	#define ISR_JMP_TO_HANDLER(x) jmp x
+#endif
+
+#define ISR_SET_HANDLER(id, handler) \
+	ISR_SET_ORG_FOR_IVT_ENTRY(id) $\
+	ISR_JMP_TO_HANDLER(handler) $\
+	// ISR_SET_HANDLER
+
+#define ISR_SET_ORG_FOR_USER_CODE() \
+	ISR_SET_ORG_FOR_IVT_ENTRY(ISR_VECTOR_COUNT)
+
+#define ISR_HANDLER(label, ...) \
+DEF_LABELED(label,             $\
+	; save SREG                  $\
+	push  r16                    $\
+	in    r16, SREG              $\
+	                             $\
+	__VA_ARGS__                  $\
+	                             $\
+	; restore SREG               $\
+	out   SREG, r16              $\
+	pop   r16                    $\
+	reti                         $\
+)
+
+///////////////////////////////////////////////////////////////////////////////
+
+#define ISR_HANDLER_00 rjmp main
+#define ISR_HANDLER_01 reti
+#define ISR_HANDLER_02 reti
+#define ISR_HANDLER_03 reti
+#define ISR_HANDLER_04 reti
+#define ISR_HANDLER_05 reti
+#define ISR_HANDLER_06 reti
+#define ISR_HANDLER_07 reti
+#define ISR_HANDLER_08 reti
+#define ISR_HANDLER_09 reti
+#define ISR_HANDLER_10 reti
+#define ISR_HANDLER_11 reti
+#define ISR_HANDLER_12 reti
+#define ISR_HANDLER_13 reti
+#define ISR_HANDLER_14 reti
+#define ISR_HANDLER_15 reti
+#define ISR_HANDLER_16 reti
+#define ISR_HANDLER_17 reti
+#define ISR_HANDLER_18 reti
+#define ISR_HANDLER_19 reti
+#define ISR_HANDLER_20 reti
+#define ISR_HANDLER_21 reti
+#define ISR_HANDLER_22 reti
+#define ISR_HANDLER_23 reti
+#define ISR_HANDLER_24 reti
+#define ISR_HANDLER_25 reti
+
+#define ISR_TABLE(...) \
+	CALL(ISR_HANDLER, REMOVE_PARENTHESIS(VARIADIC_HEAD(__VA_ARGS__))) \
+	CALL(ISR_TABLE, VARIADIC_TAIL(__VA_ARGS__))
