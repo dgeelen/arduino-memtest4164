@@ -444,3 +444,30 @@ III_ISEMPTY(                                                               \
 #define DEF_LABELED_0( name, ... )   DEF_MARKER( name, $ name: __VA_ARGS__ )
 #define DEF_LABELED_1( name      )   DEF_MARKER( name, $ name: ; note: label only$ )
 #define DEF_LABELED( ... )          CAT_N( DEF_LABELED_, IS_EMPTY( VARIADIC_TAIL( __VA_ARGS__ ) ) )( __VA_ARGS__ )
+
+
+
+/**
+ * Yet another AVRA quirk...
+ *
+ * From the official website:
+ * ---8<---------
+ *   Constant out of range
+ *
+ *   This warning occurs if a value exceeds the byte or word value of a
+ *   assignment. Read the comment posted by Jim Galbraith:
+ *
+ *   The expression (~0x80) is a Bitwise Not operation. This operator returns
+ *   the input expression with all its bits inverted. If 0x80 represents -128,
+ *   then 0x7f, or +127 should be ok. If this is considered as a 32-bit
+ *   expression (AVRA internal representation), then it appears to be more like
+ *   oxffffffff-0x80 or 0xffffffff0x80. The result would then be 0xffffff7f.
+ *   The assembler would then have to be told or it would have to decide, based
+ *   on context, how much significance to assign to the higher bits. I have
+ *   also encountered such conditions with various assemblers, including AVRA.
+ *   To make sure the assembler does what I really want, I use a construct like
+ *   0xff-0x80 or 0xff0x80. This way the bit significance cannot extend beyond
+ *   bit-7 and there cannot be any misunderstanding.
+ * --->8---------
+ */
+#define BITINV(x) (0xff - (x))
