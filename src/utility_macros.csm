@@ -297,18 +297,29 @@ III_ISEMPTY(                                                               \
       /*  4) __VA_ARGS__ expands to something starting with parenthesis,     */\
       /*     allowing IS_EMPTY_0001 to trigger.                              */\
       /*                                                                     */\
-      /* The complex structure with calling remove parentheses on the first  */\
-      /* argument is an attempt to deal with arguments of the form           */\
-      /* '(x,y),z'. Currently this provides only rudimentary protection      */\
-      /* against such arguments.                                             */\
+      /* We can do slightly better if we concatenate the __VA_ARGS__ to the  */\
+      /* IS_EMPTY and _0001 parts, because in that case we will for a new    */\
+      /* token IS_EMPTYxxxx_0001 (where 'xxxx' is whatever __VA_ARGS__       */\
+      /* expands to), not triggering IS_EMPTY_0001. Example:                 */\
+      /*   CAT_N(IS_EMPTY, __VA_ARGS__, _0001)()                             */\
+      /* However, this approach fails when __VA_ARGS__ contains elements     */\
+      /* which are not valid identifiers, and cannot be pasted together.     */\
+      /* For example strings, characters ('c'), operators ('+', '/', etc)    */\
+      /* will cause a preprocessor error.                                    */\
+      /* Being able to handle such constructs is probably more important     */\
+      /* than the ability to detect a function-like macro passed without     */\
+      /* parentheses. E.g. it will enable us to correctly count the empty    */\
+      /* parameter list (see ARG_COUNT()).                                   */\
+      /*                                                                     */\
+      /* Additionally we could do something like this:                       */\
+      /*   REMOVE_PARENTHESES( BOOST_PP_VARIADIC_ELEM( 0, __VA_ARGS__ ) )    */\
+      /* To remove parentheses on the first argument, in order to (attempt   */\
+      /* to) deal with arguments of the form '(x,y),z'.                      */\
       (                                                                        \
         HAS_COMMA(                                                             \
-          CAT_N(                                                               \
-            IS_EMPTY,                                                          \
-            REMOVE_PARENTHESES( BOOST_PP_VARIADIC_ELEM( 0, __VA_ARGS__ ) ),    \
-            _,                                                                 \
-            0001                                                               \
-          )()                                                                  \
+            IS_EMPTY_0001                                                      \
+            __VA_ARGS__                                                        \
+            ()                                                                 \
         )                                                                      \
       )                                                                        \
    )()                                                                         \
