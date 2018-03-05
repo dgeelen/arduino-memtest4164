@@ -1,0 +1,121 @@
+/******************************************************************************
+
+    Helper macros for defining string constants.
+
+    The problem is that constants are stored to Program Memory, and need to
+    be retrieved using the `lpm` instruction. However, because program
+    memory is normally only word addressable, an address always addresses
+    two bytes in Program Memory. This effectively means that the length of
+    a string constant must always be a multiple of two. If it is not, the
+    assembler automatically appends a zero byte for padding. This in turn
+    means that automatically calculating the length of a given string
+    literal at compile time is not (accurately) possible, because we never
+    get to 'see' the padding byte.
+
+    In this file there are two main macros; STRING_CONSTANT() and
+    STRING_CONSTANT_N(). The first automatically calculates the length of
+    the given string literal, but forces the user to specify the string
+    character-for-character, as separate macro arguments. The latter allows
+    the user to use `normal` string literals, but then the user has to
+    manually specify the intended length of the string. There is a sanity
+    check in place, but due to the above limitation it is only accurate
+    +/- 1 character. However, when padding the assembler does issue a
+    warning, which the user of the macro has to manually account for.
+
+ ******************************************************************************/
+#pragma once
+#include "utility_macros.csm"
+#include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/logical/compl.hpp>
+#include <boost/preprocessor/punctuation/comma_if.hpp>
+#include <boost/preprocessor/repetition/enum_params.hpp>
+#include <boost/preprocessor/seq/cat.hpp>
+
+
+
+/**
+ * Define a string constant from individual (.db) components. Length is
+ * calculated automatically. The defined string is automatically zero
+ * terminated.
+ */
+#define STRING_CONSTANT(...) DEF_LABELED(                                        \
+	STRING_CONSTANT_INTERNAL_LABEL(VARIADIC_HEAD(__VA_ARGS__)),                   $\
+	STRING_CONSTANT_ZERO_TERMINATE(                                                \
+		ARG_COUNT(VARIADIC_TAIL(__VA_ARGS__)),                                       \
+		VARIADIC_TAIL(__VA_ARGS__)                                                   \
+	)                                                                             $\
+	.equ VARIADIC_HEAD(__VA_ARGS__)                                                \
+	     = 2 * STRING_CONSTANT_INTERNAL_LABEL(VARIADIC_HEAD(__VA_ARGS__))         $\
+	.equ STRING_CONSTANT_LENGTH(VARIADIC_HEAD(__VA_ARGS__))                        \
+	     = ARG_COUNT(VARIADIC_TAIL(__VA_ARGS__))                                  $\
+) // STRING_CONSTANT
+
+
+
+/**
+ * Define a string constant given a string literal. Length must be specified
+ * manually. The defined string is automatically zero terminated.
+ *
+ * Notes:
+ *  - If length is incorrect (+/- 1), this macro will detect it
+ *    and issue an error.
+ *  - If length is even (and thus odd, after zero termination), the
+ *    assembler will issue a warning about .db segments with odd
+ *    number of bytes. In that case it is up to the user to add any
+ *    additional padding bytes.
+ *  - Additional padding bytes will be added _after_ the terminating
+ *    zero byte.
+ *
+ *    Example:
+ *    STRING_CONSTANT_N(hello_world, 12, "Hello World!", 0xff)
+ *      --> .db "Hello World!", 0, 0xff
+ */
+#define STRING_CONSTANT_N(...) DEF_LABELED(                                      \
+	STRING_CONSTANT_INTERNAL_LABEL(VARIADIC_HEAD(__VA_ARGS__)),                   $\
+	STRING_CONSTANT_ZERO_TERMINATE(VARIADIC_TAIL(__VA_ARGS__))                    $\
+	STRING_CONSTANT_INTERNAL_END_LABEL(VARIADIC_HEAD(__VA_ARGS__)):               $\
+	.equ VARIADIC_HEAD(__VA_ARGS__)                                                \
+	     = 2 * STRING_CONSTANT_INTERNAL_LABEL(VARIADIC_HEAD(__VA_ARGS__))         $\
+	.equ STRING_CONSTANT_LENGTH(VARIADIC_HEAD(__VA_ARGS__))                        \
+	     = VARIADIC_HEAD(VARIADIC_TAIL(__VA_ARGS__))                              $\
+	.if (STRING_CONSTANT_INTERNAL_END_LABEL(VARIADIC_HEAD(__VA_ARGS__))            \
+	    - STRING_CONSTANT_INTERNAL_LABEL(VARIADIC_HEAD(__VA_ARGS__)))              \
+	    != VARIADIC_HEAD(VARIADIC_TAIL(__VA_ARGS__))/2+1                          $\
+		.error BOOST_PP_STRINGIZE(String constant `VARIADIC_HEAD(__VA_ARGS__)` has   \
+		       unexpected length (VARIADIC_HEAD(VARIADIC_TAIL(__VA_ARGS__))))       $\
+	.endif                                                                        $\
+) // STRING_CONSTANT
+
+
+/**
+ * Creates a zero terminated string, with automatic padding.
+ *
+ * STRING_CONSTANT_ZERO_TERMINATE(length, ...)
+ */
+#define STRING_CONSTANT_ZERO_TERMINATE_11() 0, 0    ; empty string, zero termination and padding only
+#define STRING_CONSTANT_ZERO_TERMINATE_00()  , 0    ; zero terminated, no padding needed
+#define STRING_CONSTANT_ZERO_TERMINATE_01()  , 0, 0 ; zero terminated, padded to even no. bytes
+#define STRING_CONSTANT_ZERO_TERMINATE(...) .db VARIADIC_TAIL(__VA_ARGS__) CAT_N(STRING_CONSTANT_ZERO_TERMINATE_, IS_ZERO(VARIADIC_HEAD(__VA_ARGS__)), IS_EVEN(VARIADIC_HEAD(__VA_ARGS__)))()
+
+
+
+/**
+ * The internal label name of the given string constant.
+ *
+ * This can be used to get the word address of the string constant in Program
+ * Memory, but be aware that it will be only half of the bytes address.
+ */
+#define STRING_CONSTANT_INTERNAL_LABEL(name) CAT_N(string_constant_, name, _loc)
+#define STRING_CONSTANT_INTERNAL_END_LABEL(name) BOOST_PP_CAT(STRING_CONSTANT_INTERNAL_LABEL(name), _end)
+
+
+
+/**
+ * Returns the compile-time length of the given string constant.
+ */
+#define STRING_CONSTANT_LENGTH(name) CAT_N(string_constant_, name, _len)
+
+
+#define CARRIAGE_RETURN 0x0d
+#define LINE_FEED       0x0a
+#define CRLF            CARRIAGE_RETURN, LINE_FEED
