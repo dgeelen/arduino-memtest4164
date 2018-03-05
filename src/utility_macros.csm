@@ -27,7 +27,7 @@
 
 
 /**
- * Some debug helpers
+ * Some debug helpers.
  */
 #define FIRST( X, ... )     [[[ 1 | X ]]]
 #define SECOND( X, Y, ... ) [[[ 2 | Y ]]]
@@ -35,7 +35,7 @@
 
 
 /**
- * Forces a error to occur during macro evaluation
+ * Forces a error to occur during macro evaluation.
  *
  * Compliant compilers will complain about a macro call without an argument for
  * the variadic argument, while other compilers should simply show the error
@@ -47,7 +47,7 @@
 
 
 /**
- * Concatenates any number of arguments (up-to 64)
+ * Concatenates any number of arguments (up-to 64).
  */
 #define CAT_N_( \
   A00, A01, A02, A03, A04, A05, A06, A07, \
@@ -74,7 +74,7 @@
 
 
 /**
- * Detect whether a set of arguments contains a comma or not
+ * Detect whether a set of arguments contains a comma or not.
  * Adapted from https://gustedt.wordpress.com/2010/06/08/detect-empty-macro-arguments/
  *
  * Limited to 64 arguments due to BOOST_PP_LIMIT_VARIADIC
@@ -318,7 +318,7 @@ III_ISEMPTY(                                                               \
 
 
 /**
- * Call a function-like macro by name, optionally passing a parameter list
+ * Call a function-like macro by name, optionally passing a parameter list.
  */
 #define CALL( F, ... ) F( __VA_ARGS__ )
 
@@ -337,7 +337,7 @@ III_ISEMPTY(                                                               \
 
 
 /**
- * Returns the first element of a variadic argument list
+ * Returns the first element of a variadic argument list.
  */
 #define VARIADIC_HEAD_( first, ... ) first
 #define VARIADIC_HEAD( ... ) VARIADIC_HEAD_( __VA_ARGS__, dummy )
@@ -345,7 +345,7 @@ III_ISEMPTY(                                                               \
 
 
 /**
- * Returns all but the first element of a variadic argument list
+ * Returns all but the first element of a variadic argument list.
  */
 //*
 #define VARIADIC_TAIL_( ... )
@@ -361,7 +361,7 @@ III_ISEMPTY(                                                               \
 
 
 /**
- * Surround a macro definition with markers
+ * Surround a macro definition with markers.
  * /
 #define DEF_MARKER_( name, ... )                                               $\
   ; ---[ name ]------------------------------------------------                \
