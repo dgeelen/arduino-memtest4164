@@ -113,6 +113,21 @@
 
 
 /**
+ * Determines whether the given input number is zero or not (up-to 64).
+ *
+ * Returns 1 for zero, 0 for other numbers.
+ */
+#define IS_ZERO(x) BOOST_PP_VARIADIC_ELEM( x,     \
+	 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,         \
+	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,         \
+	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,         \
+	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,         \
+	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,         \
+	 0,  0,  0,  0,                                 \
+) // IS_ZERO
+
+
+/**
  * Detect whether a set of arguments contains a comma or not.
  * Adapted from https://gustedt.wordpress.com/2010/06/08/detect-empty-macro-arguments/
  *
