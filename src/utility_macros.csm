@@ -362,10 +362,10 @@ III_ISEMPTY(                                                               \
 /**
  * Surround a macro definition with markers.
  */
-#define DEF_MARKER_( name, ... )                                              $\
-  ; ---[ name ]------------------------------------------------                \
-  BOOST_PP_IF( IS_EMPTY( __VA_ARGS__ ),$ ; (no code)$, )__VA_ARGS__            \
-  ; -----------------------------------------------[ __FILE__:__LINE__ ]---   $\
+#define DEF_MARKER_( name, ... )                                                               $\
+  ; ---[ name ]------------------------------------------------                                 \
+  BOOST_PP_IIF( IS_EMPTY( __VA_ARGS__ ),$ ; (no code)$, )__VA_ARGS__                            \
+  ; -----------------------------------------------[ BOOST_PP_EXPAND(__FILE__:__LINE__) ]---   $\
   // DEF_MARKER_
 #define DEF_MARKER(...) DEF_MARKER_( VARIADIC_HEAD( __VA_ARGS__ ), VARIADIC_TAIL( __VA_ARGS__ ) )
 
