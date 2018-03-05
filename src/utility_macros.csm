@@ -73,6 +73,21 @@
 
 
 /**
+ * Count the number of variadic arguments passed  (up-to 64).
+ */
+#define ARG_COUNT(...) BOOST_PP_VARIADIC_ELEM( 63,  \
+	__VA_ARGS__,                                      \
+	                        63, 62, 61, 60,           \
+	59, 58, 57, 56, 55, 54, 53, 52, 51, 50,           \
+	49, 48, 47, 46, 45, 44, 43, 42, 41, 40,           \
+	39, 38, 37, 36, 35, 34, 33, 32, 31, 30,           \
+	29, 28, 27, 26, 25, 24, 23, 22, 21, 20,           \
+	19, 18, 17, 16, 15, 14, 13, 12, 11, 10,           \
+	 9,  8,  7,  6,  5,  4,  3,  2, BOOST_PP_IIF(IS_EMPTY(__VA_ARGS__), 0, 1)  \
+) // ARG_COUNT
+
+
+/**
  * Detect whether a set of arguments contains a comma or not.
  * Adapted from https://gustedt.wordpress.com/2010/06/08/detect-empty-macro-arguments/
  *
