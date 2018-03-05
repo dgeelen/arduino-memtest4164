@@ -361,19 +361,7 @@ III_ISEMPTY(                                                               \
 
 /**
  * Surround a macro definition with markers.
- * /
-#define DEF_MARKER_( name, ... )                                               $\
-  ; ---[ name ]------------------------------------------------                \
-  UNPROTECT(                                                                   \
-    BOOST_PP_IF(                                                             \
-      BOOST_PP_VARIADIC_SIZE( __VA_ARGS__ ),                   \
-      PROTECT(__VA_ARGS__),                                                    \
-      PROTECT($ ; (empty definition) $)                                        \
-    )                                                                          \
-  ) [__VA_ARGS__|BOOST_PP_VARIADIC_SIZE( __VA_ARGS__ )]                         \
-  ; -----------------------------------------------[ __FILE__:__LINE__ ]---   $\
-  // DEF_MARKER_
-  */
+ */
 #define DEF_MARKER_( name, ... )                                              $\
   ; ---[ name ]------------------------------------------------                \
   BOOST_PP_IF( IS_EMPTY( __VA_ARGS__ ),$ ; (no code)$, )__VA_ARGS__            \
