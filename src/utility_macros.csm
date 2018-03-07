@@ -15,6 +15,7 @@
 
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/facilities/identity.hpp>
 #include <boost/preprocessor/logical/compl.hpp>
@@ -471,3 +472,25 @@ III_ISEMPTY(                                                               \
  * --->8---------
  */
 #define BITINV(x) (0xff - (x))
+
+
+
+/**
+ * save_registers pushes all given registers
+ */
+#define save_registers_op(s, state, x) BOOST_PP_IIF(IS_EMPTY(state), , state $) push x
+#define save_registers(...) BOOST_PP_SEQ_FOLD_LEFT(                              \
+	save_registers_op,                                                             \
+	,                                                                              \
+	BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)                                          \
+) // push()
+
+/**
+ * restore_registers pops all given registers
+ */
+#define restore_registers_op(s, state, x) pop x BOOST_PP_IIF(IS_EMPTY(state), , $ state)
+#define restore_registers(...) BOOST_PP_SEQ_FOLD_LEFT(                           \
+	restore_registers_op,                                                          \
+	,                                                                              \
+	BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)                                          \
+) // push()
