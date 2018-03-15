@@ -98,11 +98,25 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 # So we need to move the output file to the destination ourselves...
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)  assembling $<"
 	@$(ASSEMBLER) $(ASMFLAGS) $^ 2>$<.err | tail -n +13
+# Colour the output for easy parsing (this is unrelated to checking for errors)
+	@sed -e '#\
+		/: PRAGMA directives currently ignored/d;#\
+		tExit;#\
+		#\
+		/: Warning :/s:^:$(COLOR_YELLOW):;#\
+		tResetColor;#\
+		#\
+		s:^:$(COLOR_RED):;#\
+		tResetColor;#\
+		#\
+		:ResetColor;#\
+		s:$$:$(COLOR_RESET):;#\
+		#\
+		:Exit#\
+	' $<.err
 # We invert the result of grep in the following expression so that having any
 # lines in stderr other than the PRAGMAs cause Make to exit with an error.
-	@sed -e 's:^:$(COLOR_RED):' -e 's:$$:$(COLOR_RESET):' $<.err \
-		| grep -v 'PRAGMA directives currently ignored' \
-		; test $$? -eq 1
+	@egrep -v ': PRAGMA directives currently ignored|: Warning :' $<.err >/dev/null ; test $$? -eq 1
 # Rename output (see comment above)
 	@mv $<.hex $@
 
