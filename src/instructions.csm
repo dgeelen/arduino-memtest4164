@@ -1,0 +1,97 @@
+/******************************************************************************
+
+   The AVRA 'assembler' somehow doesn't implement all instructions... oh joy...
+
+ ******************************************************************************/
+#pragma once
+
+#include "utility_macros.csm"
+#include <boost/preprocessor/comparison/equal.hpp>
+#include <boost/preprocessor/comparison/greater.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
+
+#define reg_nr_r00 00
+#define reg_nr_r01 01
+#define reg_nr_r02 02
+#define reg_nr_r03 03
+#define reg_nr_r04 04
+#define reg_nr_r05 05
+#define reg_nr_r06 06
+#define reg_nr_r07 07
+#define reg_nr_r08 08
+#define reg_nr_r09 09
+#define reg_nr_r10 10
+#define reg_nr_r11 11
+#define reg_nr_r12 12
+#define reg_nr_r13 13
+#define reg_nr_r14 14
+#define reg_nr_r15 15
+#define reg_nr_r16 16
+#define reg_nr_r17 17
+#define reg_nr_r18 18
+#define reg_nr_r19 19
+#define reg_nr_r20 20
+#define reg_nr_r21 21
+#define reg_nr_r22 22
+#define reg_nr_r23 23
+#define reg_nr_r24 24
+#define reg_nr_r25 25
+#define reg_nr_r26 26
+#define reg_nr_r27 27
+#define reg_nr_r28 28
+#define reg_nr_r29 29
+#define reg_nr_r30 30
+#define reg_nr_r31 31
+#define reg_nr(reg) reg_nr_ ## reg
+
+
+; LAT - Load and Toggle
+;
+; Load one byte indirect from data space to register and toggles bits in the
+; data space specified by the register. The instruction can only be used
+; towards SRAM.
+;
+; The data location is pointed to by the Z (16 bits) Pointer Register in the
+; Register File. Memory access is limited to the current data segment of 64K
+; bytes. To access another data segment in devices with more than 64K bytes
+; data space, the RAMPZ in register in the I/O area has to be changed.
+;
+; The Z-pointer Register is left unchanged by the operation. This instruction
+; is especially suited for changing status bits stored in SRAM.
+;
+; Operation:
+;   (Z) ← Rd ⊕ (Z), Rd ← (Z)
+;
+; Syntax:          Operands:          Program Counter:
+; LAT Z, Rd        0 ≤ d ≤ 31         PC ← PC + 1
+;
+; 16-bit Opcode:
+; 1001 000r rrrr 0111
+;
+; Words:1 (2 bytes)
+;
+; Cycles: 2
+#define lat_z(reg)  .db  (0x07 | ((reg_nr(reg) << 4)&0xf0)), (0x92 | ((reg_nr(reg) >> 4)&0x01))
+#define lat(z, reg) lat_ ## z(reg)
+
+
+
+; More fun... AVRA silently accepts additional arguments for instructions,
+; even if they are not otherwise used. E.g. it will happily assemble
+; "lsr r25, 4" into a *single* "lsr r25", without any error or warning message
+#define lsx_n(z, n, data) BOOST_PP_TUPLE_ELEM(0, data) BOOST_PP_TUPLE_ELEM(1, data)$
+#define lsx_(instr, reg, count)                                                 \
+	BOOST_PP_IF(                                                                  \
+		BOOST_PP_GREATER(count, 8),                                                 \
+		.error BOOST_PP_STRINGIZE(instr shiftcount too large: count > 8),           \
+		BOOST_PP_IF(                                                                \
+			BOOST_PP_EQUAL(count, 0),                                                 \
+			.warning BOOST_PP_STRINGIZE(Omitted instruction `instr reg` because the shiftcount was 0)$,   \
+			; instr reg by count $                                                    \
+			BOOST_PP_REPEAT(count, lsx_n, (instr, reg))                               \
+		)                                                                           \
+	)                                                                             \
+// lsr
+
+#define lsl(reg, count) lsx_(lsl, reg, count)
+#define lsr(reg, count) lsx_(lsr, reg, count)
