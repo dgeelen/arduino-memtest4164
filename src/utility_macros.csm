@@ -15,6 +15,8 @@
 
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/comparison/equal.hpp>
+#include <boost/preprocessor/comparison/greater.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/facilities/identity.hpp>
@@ -474,6 +476,101 @@ III_ISEMPTY(                                                               \
 #define BITINV(x) (0xff - (x))
 
 
+/**
+ * Helpers for manipulating the stack pointer. Used e.g. by stack_reserve()
+ * and stack_free().
+ */
+#define stack_manip___n__(z, n, data) BOOST_PP_CAT(data, $)
+#define stack_manip___n_0(n, instr, tmp_reg)                                     \
+	BOOST_PP_REPEAT(n, stack_manip___n__, instr tmp_reg)                           \
+	// stack_free_n_0
+
+#define stack_manip___min_bytes 4
+#define stack_manip___n_1(n, instr, tmp_reg_1, tmp_reg_2, tmp_reg_3)             \
+	in     tmp_reg_1, SPL                                                 /* 1 */ $\
+	in     tmp_reg_2, SPH                                                 /* 1 */ $\
+	adiw   tmp_reg_1, n                                                   /* 2 */ $\
+	; The instruction following SEI will be executed before any pending           $\
+	; interrupts. By issuing the SEI one instruction 'early', we gain a           $\
+	; small improvement in latency by allowing interrupts to trigger              $\
+	; again sooner.                                                               $\
+	in    tmp_reg_3, SREG                                                 /* 1 */ $\
+	cli                                                                   /* 1 */ $\
+	out    SPL, tmp_reg_1                                                 /* 1 */ $\
+	out    SREG, tmp_reg_3                                                /* 1 */ $\
+	out    SPH, tmp_reg_2                                                 /* 1 */ $\
+	// stack_free_n_1
+
+#define stack_manip___(description, n, mathop, pushpop, ...)                    $\
+	; description n bytes of stack space                                          $\
+	BOOST_PP_CAT(                                                                  \
+		stack_manip___n_,                                                            \
+		/* push/pop cost 2 cycles a piece, our generic routine takes 9 cycles, so */ \
+		/* after 4 push/pops it's cheaper to use the generic routine.             */ \
+		/* Space wise the generic routine would be better after 8 bytes.          */ \
+		BOOST_PP_GREATER(n, stack_manip___min_bytes)                                 \
+	)(                                                                             \
+		n,                                                                           \
+		BOOST_PP_IIF(BOOST_PP_GREATER(n, stack_manip___min_bytes), mathop, pushpop), \
+		__VA_ARGS__                                                                  \
+	)                                                                              \
+	/* this line intentionally left blank                                       */ \
+	// stack_reserve
+
+#define stack_manip__(n, description, ...)                                       \
+	BOOST_PP_IIF(                                                                  \
+		BOOST_PP_GREATER(n, stack_manip___min_bytes),                                \
+		BOOST_PP_IIF(                                                                \
+			BOOST_PP_EQUAL(ARG_COUNT(__VA_ARGS__), 3),                                 \
+			stack_manip___,                                                            \
+			.error BOOST_PP_STRINGIZE(                                                 \
+				description more than stack_manip___min_bytes (i.e. n) bytes of stack    \
+				requires 3 temporary registers (not ARG_COUNT(__VA_ARGS__)).             \
+			)                                                                         $\
+		),                                                                           \
+		BOOST_PP_IIF(                                                                \
+			BOOST_PP_EQUAL(ARG_COUNT(__VA_ARGS__), 1),                                 \
+			stack_manip___,                                                            \
+			.error BOOST_PP_STRINGIZE(                                                 \
+				description n byte(s) of stack requires a temporary register.            \
+			)                                                                         $\
+		)                                                                            \
+	)                                                                              \
+	// stack_manip__
+
+/**
+ * reserve a number of stack bytes
+ */
+#define stack_reserve(...)                                                       \
+	stack_manip__(                                                                 \
+		VARIADIC_HEAD(__VA_ARGS__),                                                  \
+		Reserving,                                                                   \
+		VARIADIC_TAIL(__VA_ARGS__)                                                   \
+	)(                                                                             \
+		Reserve,                                                                     \
+		VARIADIC_HEAD(__VA_ARGS__),                                                  \
+		sbiw,                                                                        \
+		push,                                                                        \
+		VARIADIC_TAIL(__VA_ARGS__)                                                   \
+	)                                                                              \
+	// stack_reserve
+
+/**
+ * release a number of stack bytes
+ */
+#define stack_free(...) \
+	stack_manip__(                                                                 \
+		VARIADIC_HEAD(__VA_ARGS__),                                                  \
+		Releasing,                                                                   \
+		VARIADIC_TAIL(__VA_ARGS__)                                                   \
+	)(                                                                             \
+		Release,                                                                     \
+		VARIADIC_HEAD(__VA_ARGS__),                                                  \
+		adiw,                                                                        \
+		pop,                                                                         \
+		VARIADIC_TAIL(__VA_ARGS__)                                                   \
+	)                                                                              \
+	// stack_reserve
 
 /**
  * save_registers pushes all given registers
