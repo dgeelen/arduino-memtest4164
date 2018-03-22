@@ -6,16 +6,22 @@
 
 #include "utility_macros.csm"
 #include "utility_functions.csm"
+#include "interrupts.csm"
 
-.org 0x0000 // Reset
-	jmp init
+ISR_SET_HANDLER(ISR_RESET,      main                               )
+ISR_SET_HANDLER(ISR_USART_RX,   serial_interrupt_handler_rx        )
+ISR_SET_HANDLER(ISR_USART_UDRE, serial_interrupt_handler_data_empty)
+ISR_SET_ORG_FOR_USER_CODE()
 
-init:
-	// set up the stack
-	ldi r16, low(RAMEND)
-	out SPL, r16
-	ldi r16, high(RAMEND)
-	out SPH, r16
+#include "serial.csm"
+#include "libc.csm"
+
+main:
+	; set up the stack
+	ldi r25, low(RAMEND)
+	out SPL, r25
+	ldi r25, high(RAMEND)
+	out SPH, r25
 
 	clear_all_registers()
 
@@ -28,6 +34,33 @@ init:
 	inc r01
 	dec r02
 
+	call _serial_init
+	sei
+
+.dseg
+	serial_rx_byte: .byte 1
+
+.cseg
+
+
+loop:
+	mov   r16, r01
+	ldi   zl, low(serial_rx_byte)
+	ldi   zh, high(serial_rx_byte)
+	call  serial_read
+
+	lds   r25, serial_rx_byte
+	push  r25
+	ldi   r25, low(read_byte)
+	push  r25
+	ldi   r25, high(read_byte)
+	push  r25
+	call  _printf
+	stack_free(3, r25)
+	rjmp  loop
 
 error_trap:
 	rjmp error_trap
+
+.org (RAMEND + 1)/2
+STRING_CONSTANT_N(read_byte, 19, "read byte: '%hhx'", CRLF);
