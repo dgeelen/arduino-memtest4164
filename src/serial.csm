@@ -1,0 +1,354 @@
+/******************************************************************************
+
+; UDR0 - USART I/O Data Register
+; UBRR0H - USART Baud Rate Register High Byte
+; UBRR0L - USART Baud Rate Register Low Byte
+; UCSR0A - USART Control and Status Register A
+.equ    MPCM0   = 0             ; Multi-processor Communication Mode
+.equ    U2X0    = 1             ; Double the USART transmission speed
+.equ    UPE0    = 2             ; Parity Error
+.equ    DOR0    = 3             ; Data overRun
+.equ    FE0     = 4             ; Framing Error
+.equ    UDRE0   = 5             ; USART Data Register Empty
+.equ    TXC0    = 6             ; USART Transmitt Complete
+.equ    RXC0    = 7             ; USART Receive Complete
+
+; UCSR0B - USART Control and Status Register B
+.equ    TXB80   = 0             ; Transmit Data Bit 8
+.equ    RXB80   = 1             ; Receive Data Bit 8
+.equ    UCSZ02  = 2             ; Character Size
+.equ    TXEN0   = 3             ; Transmitter Enable
+.equ    RXEN0   = 4             ; Receiver Enable
+.equ    UDRIE0  = 5             ; USART Data register Empty Interrupt Enable
+.equ    TXCIE0  = 6             ; TX Complete Interrupt Enable
+.equ    RXCIE0  = 7             ; RX Complete Interrupt Enable
+
+; UCSR0C - USART Control and Status Register C
+.equ    UCPOL0  = 0             ; Clock Polarity
+.equ    UCSZ00  = 1             ; Character Size
+.equ    UCPHA0  = UCSZ00        ; For compatibility
+.equ    UCSZ01  = 2             ; Character Size
+.equ    UDORD0  = UCSZ01        ; For compatibility
+.equ    USBS0   = 3             ; Stop Bit Select
+.equ    UPM00   = 4             ; Parity Mode Bit 0
+.equ    UPM01   = 5             ; Parity Mode Bit 1
+.equ    UMSEL00 = 6             ; USART Mode Select
+.equ    UMSEL0  = UMSEL00       ; For compatibility
+.equ    UMSEL01 = 7             ; USART Mode Select
+.equ    UMSEL1  = UMSEL01       ; For compatibility
+
+ ******************************************************************************/
+#pragma once
+
+#include "utility_macros.csm"
+#include "string_constant.csm"
+#include "interrupts.csm"
+#include "instructions.csm"
+
+
+#define F_CPU 16000000
+
+;
+; Initialise the serial port
+;
+DEF_LABELED(_serial_init,                                                       $\
+	; Enable RX and TX and interrupts                                             $\
+	; Rx complete interrupt                                                       $\
+	; Tx complete interrupt                                                       $\
+	; Data reg empty interrupt                                                    $\
+	; Initially disable Rx                                                        $\
+	; Initially disable Tx                                                        $\
+	; Character size bit 2 off                                                    $\
+	lds   r25, UCSR0B ; Memory mapped                                             $\
+	andi  r25, BITINV(1<<UCSZ02 | 1<<RXEN0 | 1<<TXEN0 | 1<<UDRIE0 | 1<<TXCIE0)    $\
+	ori   r25, (1<<RXCIE0)                                                        $\
+	sts   UCSR0B, r25                                                             $\
+	                                                                              $\
+	; Set frame format 115200,8,N,1,:                                             $\
+	; Asynchronous USART                                                          $\
+	; No parity                                                                   $\
+	; 1 stop bit                                                                  $\
+	; 8 data bits                                                                 $\
+	; Clock polarity 0 (recommended)                                              $\
+	lds   r25, UCSR0C ; Memory mapped                                             $\
+	andi  r25, BITINV(1<<UMSEL00 | 1<<UMSEL01 | 1<<UPM00 | 1<<UPM01 | 1<<USBS0 | 1<<UCPOL0) $\
+	ori   r25, (1<<UCSZ00 | 1<<UCSZ01)                                            $\
+	sts   UCSR0C, r25                                                             $\
+	                                                                              $\
+	save_registers(zl, zh)                                                        $\
+	ldi   zl, low(__serial_tx_len)                                                $\
+	ldi   zh, high(__serial_tx_len)                                               $\
+	ldi   r25, __serial_rx_var_end - __serial_rx_var_begin + 1                    $\
+	__serial_initialise_variables:                                                $\
+	sts   __serial_tx_len, r00                                                    $\
+	dec   r25                                                                     $\
+	brne  __serial_initialise_variables                                           $\
+	restore_registers(zl, zh)                                                     $\
+	                                                                              $\
+	call serial_flush                                                             $\
+	call serial_set_baudrate                                                      $\
+	call serial_rx_enable                                                         $\
+	call serial_tx_enable                                                         $\
+	ret                                                                           $\
+)
+
+.dseg
+__serial_rx_var_begin:
+
+; Tx
+__serial_tx_lpm:     .byte 1 ; source of data (ram or rom)
+__serial_tx_len:     .byte 1 ; Size of tx buffer. If > 127, uses lpm
+__serial_tx_pos:     .byte 1 ; Pos in tx buffer
+__serial_tx_buf_ptr: .byte 2 ; pointer to tx buffer
+
+; Rx
+__serial_rx_len:     .byte 1 ; Size of rx buffer
+__serial_rx_pos:     .byte 1 ; Pos in rx buffer
+__serial_rx_buf_ptr: .byte 2 ; pointer to rx buffer
+
+__serial_rx_var_end:
+.cseg
+
+
+DEF_LABELED(serial_tx_enable,                                                   $\
+	lds   r25, UCSR0B ; Memory mapped                                             $\
+	ori   r25, 1<<TXEN0                                                           $\
+	sts   UCSR0B, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+DEF_LABELED(serial_rx_enable,                                                   $\
+	lds   r25, UCSR0B ; Memory mapped                                             $\
+	ori   r25, 1<<RXEN0                                                           $\
+	sts   UCSR0B, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+DEF_LABELED(serial_tx_disable,                                                  $\
+	lds   r25, UCSR0B ; Memory mapped                                             $\
+	andi  r25, BITINV(1<<TXEN0)                                                   $\
+	sts   UCSR0B, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+DEF_LABELED(serial_rx_disable,                                                  $\
+	lds   r25, UCSR0B ; Memory mapped                                             $\
+	andi  r25, BITINV(1<<RXEN0)                                                   $\
+	sts   UCSR0B, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+DEF_LABELED(__serial_udri_enable,                                               $\
+	lds   r25, UCSR0B ; Memory mapped                                             $\
+	ori   r25, (1<<UDRIE0)                                                        $\
+	sts   UCSR0B, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+DEF_LABELED(__serial_udri_disable,                                              $\
+	lds   r25, UCSR0B ; Memory mapped                                             $\
+	andi  r25, BITINV(1<<UDRIE0)                                                  $\
+	sts   UCSR0B, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+; z: baudrate
+DEF_LABELED(serial_set_baudrate,                                                $\
+	; Compute baudrate settings:                                                  $\
+	; setting = (F_CPU / 4 / (baudrate) - 1) / 2                                  $\
+	;         = (F_CPU / (4 * baudrate) - 1) / 2                                  $\
+	                                                                              $\
+	                                                                              $\
+	                                                                              $\
+	; Configure the baudrate                                                      $\
+	;ldi   r25, high((F_CPU / 4 / (baudrate) - 1) / 2) & 0x0F; mask reserved bits  $\
+	ldi r25, 0                                                                    $\
+	sts   UBRR0H, r25 ; Memory mapped                                             $\
+	;ldi   r25, low((F_CPU / 4 / (baudrate) - 1) / 2)                              $\
+	ldi r25, 207                                                                  $\
+	sts   UBRR0L, r25 ; Memory mapped                                             $\
+	                                                                              $\
+	; Configure (enable) double-rate and Multi-processor communication mode       $\
+	; Works in conjunction with the above baudrate configuration (/2)             $\
+	lds   r25, UCSR0A ; Memory mapped                                             $\
+	andi  r25, BITINV(1<<U2X0 | 1<<MPCM0)                                         $\
+	ori   r25, 1<<U2X0                                                            $\
+	sts   UCSR0A, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+; Wait for any ongoing transmissions to finish
+DEF_LABELED(serial_wait_tx_complete,                                            $\
+	lds   r25, UCSR0B ; Memory mapped                                             $\
+	sbrs  r25, UDRIE0 ; as long as the data-empty interrupt is enabled,           $\
+	ret               ; we know we are still transmitting.                        $\
+	rjmp  serial_wait_tx_complete                                                 $\
+)
+
+
+; Flush Rx buffer
+DEF_LABELED(serial_flush,                                                       $\
+	lds   r25, UCSR0A ; Memory mapped                                             $\
+	sbrs  r25, RXC0                                                               $\
+	ret                                                                           $\
+	lds   r25, UDR0   ; Memory mapped                                             $\
+	rjmp  serial_flush                                                            $\
+)
+
+
+; r16: buffer length
+;   z: buffer
+DEF_LABELED(serial_write_ram,                                                   $\
+	sts   __serial_tx_lpm, r00                                                    $\
+	rjmp  __serial_write                                                          $\
+)
+
+; r16: buffer length
+;   z: buffer
+DEF_LABELED(serial_write_rom,                                                   $\
+	sts   __serial_tx_lpm, r01                                                    $\
+	; fallthrough to __serial_write                                               $\
+)
+
+
+; r16: buffer length
+;   z: buffer
+DEF_LABELED(__serial_write,                                                     $\
+	sts   __serial_tx_len, r16                                                    $\
+	sts   __serial_tx_pos, r00                                                    $\
+	sts   __serial_tx_buf_ptr+1, zl                                               $\
+	sts   __serial_tx_buf_ptr+0, zh                                               $\
+	; Rather than repeating the whole load byte/write to UDR dance, simply        $\
+	; trigger an interrupt which does the same thing.                             $\
+	; This also guarantees that we can write into UDR0, since UDRE0 will be set   $\
+	; (in order to trigger the interrupt).                                        $\
+	rjmp  __serial_udri_enable                                                    $\
+__serial_ret_with_error:                                                        $\
+	mov  r25, r01                                                                 $\
+	ret                                                                           $\
+)
+
+
+; configure rx buffer. read occurs in the background
+;
+; r16 - buffer length
+;   z - pointer to buffer
+DEF_LABELED(serial_async_read,                                                  $\
+	cli   ; Atomic                                                                $\
+	sts   __serial_rx_len, r16                                                    $\
+	sts   __serial_rx_pos, r00                                                    $\
+	sts   __serial_rx_buf_ptr+1, zl                                               $\
+	sts   __serial_rx_buf_ptr+0, zh                                               $\
+	sei                                                                           $\
+	ret                                                                           $\
+)
+
+
+; Reads a full buffer (blocking)
+;
+; r16 - buffer length
+;   z - pointer to buffer
+DEF_LABELED(serial_read,                                                        $\
+	call  serial_async_read                                                       $\
+__serial_read_wait:                                                             $\
+	lds   r24, __serial_rx_pos                                                    $\
+	sub   r24, r16                                                                $\
+	brne  __serial_read_wait                                                      $\
+	ret                                                                           $\
+)
+
+
+; Number of bytes available for reading without blocking
+; ret: r25
+DEF_LABELED(serial_avail,                                                       $\
+	lds   r25, __serial_rx_pos                                                    $\
+	ret                                                                           $\
+)
+
+
+ISR_HANDLER(serial_interrupt_handler_data_empty,                                $\
+	push  r25                                                                     $\
+	push  zh                                                                      $\
+	                                                                              $\
+	; check if tx buffer has data                                                 $\
+	lds   zh, __serial_tx_len                                                     $\
+	lds   r25, __serial_tx_pos                                                    $\
+	cp    zh, r25                                                                 $\
+	brne  __serial_interrupt_handler_data_empty_load_next_byte                    $\
+	call  __serial_udri_disable                                                   $\
+	rjmp  __serial_interrupt_handler_data_empty_exit                              $\
+	                                                                              $\
+	__serial_interrupt_handler_data_empty_load_next_byte:                         $\
+	; load and update pointer to rx buffer                                        $\
+	push  zl                                                                      $\
+	lds   zl, __serial_tx_buf_ptr+1                                               $\
+	lds   zh, __serial_tx_buf_ptr+0                                               $\
+	add   zl, r25                                                                 $\
+	adc   zh, r00                                                                 $\
+	inc   r25                                                                     $\
+	sts   __serial_tx_pos, r25                                                    $\
+	                                                                              $\
+	; load byte from buffer and send                                              $\
+	lds   r25, __serial_tx_lpm /* note: using cpse here would be harder, since */ $\
+	tst   r25                  /* it would require loading __serial_tx_lpm     */ $\
+	ld    r25, z               /* into a register, using an extra register.    */ $\
+	breq  __serial_interrupt_handler_data_empty_no_lds                            $\
+	lpm   r25, z                                                                  $\
+	__serial_interrupt_handler_data_empty_no_lds:                                 $\
+	sts   UDR0, r25                                                               $\
+	                                                                              $\
+	; exit                                                                        $\
+	pop   zl                                                                      $\
+	__serial_interrupt_handler_data_empty_exit:                                   $\
+	pop   zh                                                                      $\
+	pop   r25                                                                     $\
+)
+
+
+;ISR_HANDLER(serial_interrupt_handler_tx,                                       $\
+;	call  __serial_udri_disable                                                   $\
+;)
+
+
+ISR_HANDLER(serial_interrupt_handler_rx,                                        $\
+	push  r24                                                                     $\
+	push  r25                                                                     $\
+	                                                                              $\
+	; check if rx buffer has space                                                $\
+	lds   r25, __serial_rx_len                                                    $\
+	lds   r24, __serial_rx_pos                                                    $\
+	cp    r25, r24                                                                $\
+	                                                                              $\
+	; read data byte, ack interrupt                                               $\
+	lds   r25, UDR0                                                               $\
+	                                                                              $\
+	; abort if not enough space in buffer                                         $\
+	breq  __serial_interrupt_handler_rx_exit                                      $\
+	                                                                              $\
+	; load pointer to rx buffer                                                   $\
+	push  zl                                                                      $\
+	push  zh                                                                      $\
+	lds   zl, __serial_rx_buf_ptr+1                                               $\
+	lds   zh, __serial_rx_buf_ptr+0                                               $\
+	add   zl, r24                                                                 $\
+	adc   zh, r00                                                                 $\
+	                                                                              $\
+	; store byte to buffer                                                        $\
+	st    z, r25                                                                  $\
+	inc   r24                                                                     $\
+	sts   __serial_rx_pos, r24                                                    $\
+	                                                                              $\
+	; exit                                                                        $\
+	pop   zh                                                                      $\
+	pop   zl                                                                      $\
+	__serial_interrupt_handler_rx_exit:                                           $\
+	pop   r25                                                                     $\
+	pop   r24                                                                     $\
+)
