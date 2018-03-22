@@ -1,0 +1,399 @@
+/******************************************************************************
+
+   The familiar C set of functions. Sorta.
+
+   Note:
+   The IO functions assume that any pointer with a value <= RAMEND points
+   into RAM, while any RAMEND < pointer <= FLASHEND is considered to be a
+   pointer into ROM. A pointer value > FLASHEND is considered invalid. I/O
+   space is considered RAM. This implies that there is a small region of
+   ROM which cannot be used for ROM pointers (0..RAMEND).
+
+   Definitions
+   -------------------------------------------------------------------------
+    * sizeof(int) == 16
+    * byte order of e.g. integers in memory is msb first.
+      E.g. 0x1234 is stored as ... 0x12 0x34 ... and 0x12345678 is stored
+      as ... 0x12 0x34 0x56 0x78 ...
+    * arguments are passed on the stack in reverse order (i.e. first argument
+      should be pushed last).
+
+ ******************************************************************************/
+#pragma once
+#include "utility_macros.csm"
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/preprocessor/seq/cat.hpp>
+#include <boost/preprocessor/seq/cat.hpp>
+
+
+////////////////////////////////////////////////////////////////////////////////
+#define SAVE_Z_REG_AND_LOAD_x SAVE_Z_REG_AND_LOAD(x)
+#define SAVE_Z_REG_AND_LOAD_y SAVE_Z_REG_AND_LOAD(y)
+#define SAVE_Z_REG_AND_LOAD_z
+#define SAVE_Z_REG_AND_LOAD(x)                                                   \
+	push  zl                                                                      $\
+	push  zh                                                                      $\
+	mov   zl, x ## l                                                              $\
+	mov   zh, x ## h                                                              $\
+// SAVE_Z_REG_AND_LOAD
+
+////////////////////////////////////////////////////////////////////////////////
+#define RESTORE_Z_REG_x RESTORE_Z_REG(x)
+#define RESTORE_Z_REG_y RESTORE_Z_REG(y)
+#define RESTORE_Z_REG_z
+#define RESTORE_Z_REG(x)                                                         \
+	pop   zh                                                                      $\
+	pop   zl                                                                      $\
+// RESTORE_Z_REG
+
+////////////////////////////////////////////////////////////////////////////////
+; in:  z
+; out: r25
+DEF_LABELED(_is_ram_addr,                                                       $\
+	cpi   zl, low(RAMEND+1)                                                       $\
+	ldi   r25, high(RAMEND+1)                                                     $\
+	cpc   zh, r25           ; if(z <= RAMEND) C=1 else C=0                        $\
+	; if z < RAMEND it is either RAM or IO,                                       $\
+	; but we consider both as RAM                                                 $\
+	clr   r25                                                                     $\
+	adc   r25, r00                                                                $\
+	ret                                                                           $\
+)
+#define is_ram_addr(x)                                                           \
+	SAVE_Z_REG_AND_LOAD_ ## x                                                      \
+	call _is_ram_addr                                                             $\
+	RESTORE_Z_REG_ ## x                                                            \
+// is_ram_addr()
+
+
+////////////////////////////////////////////////////////////////////////////////
+; in:  z
+;      SP
+; out: r25
+DEF_LABELED(_is_rom_addr,                                                       $\
+	cpi   zl, low(FLASHEND+1)                                                     $\
+	ldi   r25, high(FLASHEND+1)                                                   $\
+	cpc   zh, r25                                                                 $\
+	; if z < FLASHEND it is either ROM or RAM,                                    $\
+	; but if z > FLASHEND it is just invalid (so we say it is not rom)            $\
+	brsh  __is_rom_addr     ; if(z<=FLASHEND) C=1 else C=0                        $\
+	                                                                              $\
+	; See if it is RAM rather than ROM                                            $\
+	; if both RAM and ROM it is RAM (and not rom)                                 $\
+	ldi   r25, low(RAMEND)                                                        $\
+	cp    r25, zl                                                                 $\
+	ldi   r25, high(RAMEND)                                                       $\
+	cpc   r25, zh           ; if(RAMEND < z) C=1 else C=0                         $\
+__is_rom_addr:                                                                  $\
+	clr   r25                                                                     $\
+	adc   r25, r00                                                                $\
+	ret                                                                           $\
+)
+#define is_rom_addr(x)                                                           \
+	SAVE_Z_REG_AND_LOAD_ ## x                                                      \
+	call _is_rom_addr                                                             $\
+	RESTORE_Z_REG_ ## x                                                            \
+// is_ram_addr()
+
+////////////////////////////////////////////////////////////////////////////////
+;   z: buffer
+; r16: buffer length           ; XXX: strlen()
+DEF_LABELED(_puts,                                                              $\
+	call  serial_wait_tx_complete                                                 $\
+	call  serial_write_rom                                                        $\
+	ret ; XXX: puts should add a newline                                          $\
+)
+#define puts(x)                                                                 $\
+	save_registers(zl, zh, r16)                                                   $\
+	ldi   r16, STRING_CONSTANT_LENGTH(x)                                          $\
+	ldi   zl, low(x)                                                              $\
+	ldi   zh, high(x)                                                             $\
+	call  _puts                                                                   $\
+	restore_registers(zl, zh, r16)                                                $\
+// puts()
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+; z: pointer to format string
+; stack: arguments, pushed in reverse order of appearance. I.e. first argument
+;        in format string is pushed last.
+;
+; ret: r25 = num chars written, or -1 on error
+DEF_LABELED(_printf,                                                            $\
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;$\
+	.set __printf_conversion_specifier_bit  = 7                                   $\
+	.set __printf_escape_seq_bit            = 6                                   $\
+	                                                                              $\
+	.set __printf_conversion_specifier_mask =                                      \
+	     1 << __printf_conversion_specifier_bit                                   $\
+	.set __printf_escape_seq_mask           =                                      \
+	     1 << __printf_escape_seq_bit                                             $\
+	                                                                              $\
+	.set __printf_argument_length_mask      = 0x07                                $\
+	                                                                              $\
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;$\
+	; set the current argument (before mangling sp, not using stack)              $\
+	;                                                                             $\
+	; When called, SP points to the first free stack byte, so we need to add 1    $\
+	; to get at the first byte of the return address. The return address is       $\
+	; pushed onto the stack lsb first (i.e. push low(PC); push high(PC), so in    $\
+	; memory order the most significant byte comes first). The return address     $\
+	; points at the instruction following the call. Additionally the address      $\
+	; that is stored is the _word_ address, so to get the byte address it needs   $\
+	; to be multiplied by two (e.g. if it needs to match up with the              $\
+	; disassembly).                                                               $\
+	; We also need to skip the return address to get at the first argument, for   $\
+	; a total of 3 bytes adjustment.                                              $\
+	ldi    r24,  3 ; adjust sp                                                    $\
+	in     r25, SPL                                                               $\
+	add    r25, r24                                                               $\
+	sts    __printf_arg_ptr+1, r25                                                $\
+	in     r25, SPH                                                               $\
+	adc    r25, r00                                                               $\
+	sts    __printf_arg_ptr+0, r25                                                $\
+	                                                                              $\
+	save_registers(                                                                \
+		r08, r09,                                                                    \
+		r16, r19,                                                                    \
+		r20, r21, r22, r23,                                                          \
+		xl, xh, yl, yh, zl, zh                                                       \
+	)                                                                             $\
+	                                                                              $\
+	; fetch the format string pointer into z, update arg ptr                      $\
+	lds    xl, __printf_arg_ptr+1                                                 $\
+	lds    xh, __printf_arg_ptr+0                                                 $\
+	ld     zh, x+                                                                 $\
+	ld     zl, x+                                                                 $\
+	sts    __printf_arg_ptr+1, xl                                                 $\
+	sts    __printf_arg_ptr+0, xh                                                 $\
+	                                                                              $\
+	is_ram_addr(z)                                                                $\
+	mov    r08, r25      ; r08 will decide if we use (0) lpm or (1) plain ld      $\
+	ldi    r25, '%'      ;                                                        $\
+	mov    r09, r25      ; r09 is the conversion specifier introductory character $\
+	clr    r16           ; r16 will be the length of the unprinted string         $\
+	ldi    r22, 2        ; r22 will be flags; lower 3 bits indicate length        $\
+	clr    r23           ; r23 will be 'in conversion specifier' + type?          $\
+	movw   yl, zl        ; y will always point at the first unprinted byte        $\
+	                                                                              $\
+	rjmp   __printf_start                                                         $\
+	                                                                              $\
+)
+
+DEF_LABELED(; main loop,                                                        $\
+	; Either not a valid conversion specifier, or not implemented                 $\
+	; switch back to regular printing                                             $\
+__printf_conversion_specifier_error:                                            $\
+	/*puts(excl)*/                                                                $\
+	andi    r23, BITINV(__printf_conversion_specifier_mask)                       $\
+	                                                                              $\
+	; We get here if we've just read a char, we're not parsing a conversion       $\
+	; specifier, and the char we read is not '%'                                  $\
+__printf_next_char:                                                             $\
+	inc    r16 ; one more char for the output buffer                              $\
+	                                                                              $\
+__printf_start:                                                                 $\
+	ld     r25, z                                                                 $\
+	cpse   r08, r01                                                               $\
+	lpm    r25, z                                                                 $\
+	add    zl, r01                                                                $\
+	adc    zh, r00                                                                $\
+	                                                                              $\
+	; see if it is eol                                                            $\
+	tst    r25                                                                    $\
+	breq   __printf_done                                                          $\
+	                                                                              $\
+	sbrc   r23, __printf_conversion_specifier_bit                                 $\
+	rjmp   __printf_conversion_specifier_seq                                      $\
+	                                                                              $\
+	; see if it is the conversion specifier introductory character                $\
+	cpse   r25, r09                                                               $\
+	rjmp   __printf_next_char                                                     $\
+	                                                                              $\
+	; it is the conversion specifier introductory character,                      $\
+	; output current buffer and switch to conversion specifier mode               $\
+	cpse   r16, r00                                                               $\
+	rcall  __printf_serial_write                                                  $\
+	ori    r23, __printf_conversion_specifier_mask                                $\
+	movw   yl, zl   ; remember start position (yl points at '%')                  $\
+	mov    r16, r00 ; updated in __printf_next_char                               $\
+	rjmp   __printf_next_char                                                     $\
+	                                                                              $\
+	; currently _in_ a conversion specifier                                       $\
+__printf_conversion_specifier_seq:                                              $\
+	                                                                              $\
+	; check for -/+/ /#/0                                                         $\
+	                                                                              $\
+	                                                                              $\
+	; check for field width (int or *)                                            $\
+	                                                                              $\
+	                                                                              $\
+	; check for precision (. followed by int or *)                                $\
+	                                                                              $\
+)
+
+DEF_LABELED(; length modifiers,                                                 $\
+	; check for length modifier (h, l)                                            $\
+__printf_length_modifier_h:                                                     $\
+	ldi    r24, 'h'                                                               $\
+	cpse   r25, r24                                                               $\
+	rjmp   __printf_length_modifier_l                                             $\
+	mov    r25, r22                                                               $\
+	andi   r25, __printf_argument_length_mask                                     $\
+	cp     r25, r00                                                               $\
+	breq   __printf_conversion_specifier_error                                    $\
+	dec    r25                                                                    $\
+	andi   r22, BITINV(__printf_argument_length_mask)                             $\
+	or     r22, r25                                                               $\
+	rjmp   __printf_next_char                                                     $\
+	                                                                              $\
+__printf_length_modifier_l:                                                     $\
+	ldi    r24, 'l'                                                               $\
+	cpse   r25, r24                                                               $\
+	rjmp   __printf_conversion_format_specifier_x                                 $\
+	mov    r25, r22                                                               $\
+	andi   r25, __printf_argument_length_mask                                     $\
+	ldi    r24, 0x04                                                              $\
+	cp     r25, r24                                                               $\
+	breq   __printf_conversion_specifier_error                                    $\
+	inc    r25                                                                    $\
+	andi   r22, BITINV(__printf_argument_length_mask)                             $\
+	or     r22, r25                                                               $\
+	rjmp   __printf_next_char                                                     $\
+)
+
+DEF_LABELED(; conversion format specifiers,                                     $\
+	; see if it is any of the conversion format specifiers                        $\
+__printf_conversion_format_specifier_x:                                         $\
+	ldi    r24, 'x'                                                               $\
+	cpse   r25, r24                                                               $\
+	; Nothing valid matched in conversion format specifier                        $\
+	rjmp   __printf_conversion_specifier_error                                    $\
+	rjmp   __printf_x                                                             $\
+	                                                                              $\
+)
+
+DEF_LABELED(; exit points,                                                      $\
+__printf_ret_error:                                                             $\
+	mov    r25, r02                                                               $\
+	                                                                              $\
+__printf_done:                                                                  $\
+	/*puts(hash)*/                                                                $\
+	cpse   r16, r00                                                               $\
+	rcall  __printf_serial_write ; print any remaining chars                      $\
+	restore_registers(                                                            \
+		r08, r09,                                                                   \
+		r16, r19,                                                                   \
+		r20, r21, r22, r23,                                                         \
+		xl, xh, yl, yh, zl, zh                                                      \
+	)                                                                             $\
+	ret                                                                           $\
+)
+
+; prints the currently accumulated buffer (in yl)
+; len should be in r16 already
+; saves z
+; clobbers x
+DEF_LABELED(__printf_serial_write,                                              $\
+	/*puts(abrackl)*/                                                             $\
+	movw   xl, zl   ; save current position                                       $\
+	movw   zl, yl   ; output buffer start, r16 is already set to len              $\
+	call   serial_wait_tx_complete                                                $\
+	cpse   r08, r01                                                               $\
+	call   serial_write_rom                                                       $\
+	cpse   r08, r00                                                               $\
+	call   serial_write_ram                                                       $\
+	movw   zl, xl   ; restore current position                                    $\
+	/*puts(abrackr)*/                                                             $\
+	ret                                                                           $\
+)
+
+DEF_LABELED(__printf_x,                                                         $\
+	; save pointer to format string                                               $\
+	movw   yl, zl ; z points at next char after 'x'                               $\
+	                                                                              $\
+	; determine argument length (bytes)                                           $\
+	mov    r25, r22                                                               $\
+	andi   r25, __printf_argument_length_mask                                     $\
+	ldi    zl, low(2*__printf_arglen_int_lookup)                                  $\
+	ldi    zh, high(2*__printf_arglen_int_lookup)                                 $\
+	add    zl, r25                                                                $\
+	adc    zh, r00                                                                $\
+	lpm    r24, z   ; r24 is the length of the argument                           $\
+	mov    r16, r24                                                               $\
+	lsl    r16      ; 2 chars/byte                                                $\
+	                                                                              $\
+	; it seems that the calculation is probably faster/easier than a lookup table $\
+	; because of the cumbersome offset calculation                                $\
+	lds    xl, __printf_arg_ptr+1                                                 $\
+	lds    xh, __printf_arg_ptr+0                                                 $\
+	ldi    zl, low(__printf_work_area)                                            $\
+	ldi    zh, high(__printf_work_area)                                           $\
+	                                                                              $\
+	; We are about to (re)use the (shared) __printf_work_area                     $\
+	call   serial_wait_tx_complete                                                $\
+	                                                                              $\
+	; high nibble                                                                 $\
+__printf_x_next_byte:                                                           $\
+	ld     r25, x                                                                 $\
+	lsr    (r25, 4)                                                               $\
+	andi   r25, 0x0f                                                              $\
+	cpi    r25, 0x0a                                                              $\
+	brlo   __printf_x_next_byte_high                                              $\
+	subi   r25, -('a'-'9'-1)                                                      $\
+__printf_x_next_byte_high:                                                      $\
+	subi   r25, -'0'                                                              $\
+	st     z, r25                                                                 $\
+	adiw   zl, 1                                                                  $\
+	                                                                              $\
+	; low nibble                                                                  $\
+	ld     r25, x                                                                 $\
+	andi   r25, 0x0f                                                              $\
+	cpi    r25, 0x0a                                                              $\
+	brlo   __printf_x_next_byte_low                                               $\
+	subi   r25, -('a'-'9'-1)                                                      $\
+__printf_x_next_byte_low:                                                       $\
+	subi   r25, -'0'                                                              $\
+	st     z, r25                                                                 $\
+	adiw   zl, 1                                                                  $\
+	                                                                              $\
+	; done?                                                                       $\
+	adiw   xl, 1                                                                  $\
+	dec    r24                                                                    $\
+	brne   __printf_x_next_byte                                                   $\
+	sts    __printf_arg_ptr+1, xl                                                 $\
+	sts    __printf_arg_ptr+0, xh ; next argument                                 $\
+	                                                                              $\
+	; write buffer (r16 is set correctly above)                                   $\
+	; at this point yl = current pos, __printf_serial_ preserves z,               $\
+	; and z needs to be restored before exit                                      $\
+	movw   zl, yl         ; restore z                                             $\
+	ldi    yl, low(__printf_work_area)                                            $\
+	ldi    yh, high(__printf_work_area) ; __printf_serial_write needs ptr in y    $\
+	mov    r22, r08       ; r22 is not needed anymore (for this format specifier) $\
+	mov    r08, r01       ; always write from ram (__printf_work_area)            $\
+  ; r16 must always > 0 here                                                    $\
+	rcall  __printf_serial_write                                                  $\
+	mov    r08, r22                                                               $\
+	                                                                              $\
+	; switch back to normal printing                                              $\
+	andi   r23, BITINV(__printf_conversion_specifier_mask)                        $\
+	; zl already points at the current position                                   $\
+	 ; but yl points at the work aread rather than the start of the current seq.  $\
+	movw   yl, zl                                                                 $\
+	clr    r16    ; start fresh                                                   $\
+	rjmp   __printf_start                                                         $\
+)
+
+DEF_LABELED(__printf_variables,                                                 $\
+	.dseg                                                                         $\
+__printf_arg_ptr:   .byte 2                                                     $\
+__printf_work_area: .byte 8                                                     $\
+)
+
+DEF_LABELED(__printf_constants,                                                 $\
+	.cseg                                                                         $\
+	                          /*  %hh, %h,  %, %l, %ll */                         $\
+__printf_arglen_int_lookup: .db   1,  2,  2,  4,   8,  0                        $\
+)
