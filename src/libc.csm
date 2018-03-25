@@ -197,8 +197,7 @@ __printf_start:                                                                 
 	ld     r25, z                                                                 $\
 	cpse   r08, r01                                                               $\
 	lpm    r25, z                                                                 $\
-	add    zl, r01                                                                $\
-	adc    zh, r00                                                                $\
+	adiw   zl, 1                                                                  $\
 	                                                                              $\
 	; see if it is eol                                                            $\
 	tst    r25                                                                    $\
