@@ -119,6 +119,6 @@
 /**
  * Various named constants, for ease of use
  */
-#define CARRIAGE_RETURN 0x0d
-#define LINE_FEED       0x0a
-#define CRLF            CARRIAGE_RETURN, LINE_FEED
+#define STRING_CONSTANT_LINE_FEED       0x0a
+#define STRING_CONSTANT_CARRIAGE_RETURN 0x0d
+#define STRING_CONSTANT_CRLF            STRING_CONSTANT_CARRIAGE_RETURN, STRING_CONSTANT_LINE_FEED
