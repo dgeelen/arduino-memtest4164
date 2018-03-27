@@ -191,13 +191,13 @@ __printf_conversion_specifier_error:                                            
 	; We get here if we've just read a char, we're not parsing a conversion       $\
 	; specifier, and the char we read is not '%'                                  $\
 __printf_next_char:                                                             $\
+	adiw   zl, 1                                                                  $\
 	inc    r16 ; one more char for the output buffer                              $\
 	                                                                              $\
 __printf_start:                                                                 $\
 	ld     r25, z                                                                 $\
 	cpse   r08, r01                                                               $\
 	lpm    r25, z                                                                 $\
-	adiw   zl, 1                                                                  $\
 	                                                                              $\
 	; see if it is eol                                                            $\
 	tst    r25                                                                    $\
@@ -310,7 +310,7 @@ DEF_LABELED(__printf_serial_write,                                              
 
 DEF_LABELED(__printf_x,                                                         $\
 	; save pointer to format string                                               $\
-	movw   yl, zl ; z points at next char after 'x'                               $\
+	movw   yl, zl ; z points *at*  'x'                                            $\
 	                                                                              $\
 	; determine argument length (bytes)                                           $\
 	mov    r25, r22                                                               $\
@@ -379,10 +379,11 @@ __printf_x_next_byte_low:                                                       
 	; switch back to normal printing                                              $\
 	andi   r23, BITINV(__printf_conversion_specifier_mask)                        $\
 	; zl already points at the current position                                   $\
-	 ; but yl points at the work aread rather than the start of the current seq.  $\
+	; but yl points at the work area rather than the start of the current seq.    $\
 	movw   yl, zl                                                                 $\
-	clr    r16    ; start fresh                                                   $\
-	rjmp   __printf_start                                                         $\
+	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
+	adiw   yl, 1          ; which will overflow r16 to 0 and inc zl, but for yl   $\
+	rjmp   __printf_next_char ; we have to do it here.                            $\
 )
 
 DEF_LABELED(__printf_variables,                                                 $\
