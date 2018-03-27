@@ -278,9 +278,9 @@ __printf_ret_error:                                                             
 	mov    r25, r02                                                               $\
 	                                                                              $\
 __printf_done:                                                                  $\
-	/*puts(hash)*/                                                                $\
 	cpse   r16, r00                                                               $\
 	rcall  __printf_serial_write ; print any remaining chars                      $\
+	/*puts(hash)*/                                                                $\
 	restore_registers(                                                            \
 		r08, r09,                                                                   \
 		r16, r19,                                                                   \
