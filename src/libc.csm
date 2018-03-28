@@ -250,7 +250,7 @@ __printf_length_modifier_h:                                                     
 __printf_length_modifier_l:                                                     $\
 	ldi    r24, 'l'                                                               $\
 	cpse   r25, r24                                                               $\
-	rjmp   __printf_conversion_format_specifier_x                                 $\
+	rjmp   __printf_conversion_format_specifiers                                  $\
 	mov    r25, r22                                                               $\
 	andi   r25, __printf_argument_length_mask                                     $\
 	ldi    r24, 0x04                                                              $\
@@ -262,17 +262,20 @@ __printf_length_modifier_l:                                                     
 	rjmp   __printf_next_char                                                     $\
 )
 
-DEF_LABELED(; conversion format specifiers,                                     $\
+DEF_LABELED(__printf_conversion_format_specifiers,                              $\
 	; see if it is any of the conversion format specifiers                        $\
 __printf_conversion_format_specifier_x:                                         $\
-	ldi    r24, 'x'                                                               $\
-	cpse   r25, r24                                                               $\
-	; Nothing valid matched in conversion format specifier                        $\
-	rjmp   __printf_conversion_specifier_error                                    $\
 	ldi    yl, low(__printf_x)                                                    $\
 	ldi    yh, high(__printf_x)                                                   $\
-	rjmp   __printf_prepare                                                       $\
+	ldi    r24, 'x'                                                               $\
+	cp     r25, r24                                                               $\
+	breq   __printf_prepare                                                       $\
+	ldi    r24, 'X'                                                               $\
+	cp     r25, r24                                                               $\
+	breq   __printf_prepare                                                       $\
 	                                                                              $\
+	; Nothing valid matched in conversion format specifier                        $\
+	rjmp   __printf_conversion_specifier_error                                    $\
 )
 
 DEF_LABELED(; exit points,                                                      $\
@@ -346,6 +349,13 @@ DEF_LABELED(__printf_prepare,                                                   
 
 
 DEF_LABELED(__printf_x,                                                         $\
+	; determine capitals/non-capitals                                             $\
+	movw   zl, xl                                                                 $\
+	ld     r23, z                                                                 $\
+	cpse   r08, r01                                                               $\
+	lpm    r23, z                                                                 $\
+	subi   r23, 0x0a + '0' + 'x' - 'a'                                            $\
+	                                                                              $\
 	ldi    zl, low(__printf_work_area)                                            $\
 	ldi    zh, high(__printf_work_area)                                           $\
 	                                                                              $\
@@ -356,7 +366,7 @@ __printf_x_next_byte:                                                           
 	andi   r25, 0x0f                                                              $\
 	cpi    r25, 0x0a                                                              $\
 	brlo   __printf_x_next_byte_high                                              $\
-	subi   r25, -('a'-'9'-1)                                                      $\
+	add    r25, r23                                                               $\
 __printf_x_next_byte_high:                                                      $\
 	subi   r25, -'0'                                                              $\
 	st     z, r25                                                                 $\
@@ -367,7 +377,7 @@ __printf_x_next_byte_high:                                                      
 	andi   r25, 0x0f                                                              $\
 	cpi    r25, 0x0a                                                              $\
 	brlo   __printf_x_next_byte_low                                               $\
-	subi   r25, -('a'-'9'-1)                                                      $\
+	add    r25, r23                                                               $\
 __printf_x_next_byte_low:                                                       $\
 	subi   r25, -'0'                                                              $\
 	st     z, r25                                                                 $\
