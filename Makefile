@@ -84,7 +84,7 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 # Compress whitespace (lines) to at most 3 in a row
 	@sed -ni '/^\s*$$/d;:b;/^\s*$$/!bn;p;n;/^\s*$$/!bn;p;n;/^\s*$$/!bn;p;:w;n;/^\s*$$/bw;bb;:n;p;n;bb' $@
 
-%.hex: %.pp_asm
+%.hex %.map: %.pp_asm
 # NOTE:
 # AVRA is a piece of shit garbage, and most command line arguments don't work.
 # E.g. for the output file argument the source mentions 'Not implemented ? B.A.'
@@ -97,7 +97,7 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 #
 # So we need to move the output file to the destination ourselves...
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)  assembling $<"
-	@$(ASSEMBLER) $(ASMFLAGS) $^ 2>$<.err | tail -n +13
+	$(ASSEMBLER) $(ASMFLAGS) -m $(^:.pp_asm=.map) $^ 2>$<.err | tail -n +13
 # Colour the output for easy parsing (this is unrelated to checking for errors)
 	@sed -e '#\
 		/: PRAGMA directives currently ignored/d;#\
@@ -129,6 +129,25 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 	@avr-objdump -zD --prefix-address --show-raw-insn --insn-width 4 -b binary -m avr $< > $@
 
 disassembly: $(TARGETS:.bin=.asm)
+
+simulation: $(TARGETS)
+	@echo "$(COLOR_CYAN)[ simavr    ]$(COLOR_RESET) Running simulation..."
+# simavr only loads the last section in a .hex file, so we can't use the
+# regular (intermediate) hex file, we have to 'generate' a single-section hex
+# file from the binary
+	@objcopy --input-target binary --output-target ihex $< $(TARGETS:.bin=_simavr.hex)
+	@echo '#!/bin/sh\
+simavr --gdb --mcu atmega328p --freq 16000000 -ff $(TARGETS:.bin=_simavr.hex) &\
+#simavr --trace -v -v -v --gdb --mcu atmega328p --freq 16000000 -ff $(TARGETS:.bin=_simavr.hex) &\
+SIMAVR_PID=$$!\
+echo SIMAVR_PID=$${SIMAVR_PID}\
+avr-gdb -ex "target remote 127.0.0.1:1234"\
+kill $${SIMAVR_PID}\
+wait $${SIMAVR_PID}\
+	' | sed 's:\\$$::' > $(BUILDDIR)/run_simavr_gdb.sh
+	@chmod +x $(BUILDDIR)/run_simavr_gdb.sh
+	@./$(BUILDDIR)/run_simavr_gdb.sh || true
+	@echo "Simulation closed"
 
 listen: tty_discover
 	@echo "$(COLOR_CYAN)[ running   ]$(COLOR_RESET) Listening on tty..."
