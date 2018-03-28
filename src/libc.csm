@@ -115,6 +115,19 @@ DEF_LABELED(_puts,                                                              
 
 
 ////////////////////////////////////////////////////////////////////////////////
+DEF_LABELED(__printf_variables,                                                 $\
+	.dseg                                                                         $\
+	; Note:                                                                       $\
+	; The work area is allocated separately, so that we do not have to wait for   $\
+	; serial TX end before returning from printf() when the last thing to print   $\
+	; was a format specifier.                                                     $\
+__printf_arg_ptr:   .byte 2                                                     $\
+__printf_work_area: .byte 10 ; 4-byte unsigned printed as decimal               $\
+__printf_work_area_end:                                                         $\
+	.set __printf_work_area_size = __printf_work_area_end - __printf_work_area    $\
+	.cseg
+)
+
 ; z: pointer to format string
 ; stack: arguments, pushed in reverse order of appearance. I.e. first argument
 ;        in format string is pushed last.
@@ -264,6 +277,16 @@ __printf_length_modifier_l:                                                     
 
 DEF_LABELED(__printf_conversion_format_specifiers,                              $\
 	; see if it is any of the conversion format specifiers                        $\
+__printf_conversion_format_specifier_d:                                         $\
+	ldi    yl, low(__printf_d)                                                    $\
+	ldi    yh, high(__printf_d)                                                   $\
+	ldi    r24, 'd'                                                               $\
+	cp     r25, r24                                                               $\
+	breq   __printf_prepare                                                       $\
+	ldi    r24, 'D'                                                               $\
+	cp     r25, r24                                                               $\
+	breq   __printf_prepare                                                       $\
+	                                                                              $\
 __printf_conversion_format_specifier_x:                                         $\
 	ldi    yl, low(__printf_x)                                                    $\
 	ldi    yh, high(__printf_x)                                                   $\
@@ -346,6 +369,40 @@ DEF_LABELED(__printf_prepare,                                                   
 )
 
 
+; x   = current char ptr
+; y   = arg ptr
+; z   = work area ptr
+; r16 = free (format specifier length (+/1))
+; r25 = free
+; r24 = free
+; r23 = length of arg
+; r22 = free
+; r21 = free (unused)
+; r20 = free (unused)
+DEF_LABELED(__printf_d,                                                         $\
+	movw   zl, xl   ; save current char ptr                                       $\
+	movw   xl, yl   ; xl points to arg                                            $\
+	mov    r16, r23 ; arg len                                                     $\
+	ldi    yl, low(__printf_work_area_end)                                        $\
+	ldi    yh, high(__printf_work_area_end)                                       $\
+	call   bcd2bin_bytes                                                          $\
+	mov    r23, r25 ; save (see below)                                            $\
+	add    yl, r24  ; yl points to output buf                                     $\
+	call   bin2bcd                                                                $\
+	                                                                              $\
+	; evil hack, jump to __printf_x                                               $\
+	; xl should point to current char                                             $\
+	; yl already points to (our) arg                                              $\
+	; zl should point to work area                                                $\
+	movw   xl, zl                                                                 $\
+	ldi    zl, low(__printf_work_area) ; yl points to output buf                  $\
+	ldi    zh, high(__printf_work_area)                                           $\
+	lsl    r23 /* 'correct' arglen for bcd encoded number: 2 chars/byte */        $\
+	mov    r16, r23                                                               $\
+	rjmp   __printf_x_next_byte                                                   $\
+)
+
+
 DEF_LABELED(__printf_x,                                                         $\
 	; determine capitals/non-capitals                                             $\
 	movw   zl, xl                                                                 $\
@@ -415,16 +472,6 @@ DEF_LABELED(__printf_write_work_area_and_resume,                                
 	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
 	adiw   yl, 1          ; which will overflow r16 to 0 and inc zl, but for yl   $\
 	rjmp   __printf_next_char ; we have to do it here.                            $\
-)
-
-DEF_LABELED(__printf_variables,                                                 $\
-	.dseg                                                                         $\
-	; Note:                                                                       $\
-	; The work area is allocated separately, so that we do not have to wait for   $\
-	; serial TX end before returning from printf() when the last thing to print   $\
-	; was a format specifier.                                                     $\
-__printf_arg_ptr:   .byte 2                                                     $\
-__printf_work_area: .byte 8                                                     $\
 )
 
 DEF_LABELED(__printf_constants,                                                 $\
