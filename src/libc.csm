@@ -333,9 +333,7 @@ DEF_LABELED(__printf_prepare,                                                   
 	ldi    zh, high(2*__printf_arglen_int_lookup)                                 $\
 	add    zl, r25                                                                $\
 	adc    zh, r00                                                                $\
-	lpm    r24, z   ; r24 is the length of the argument                           $\
-	mov    r16, r24                                                               $\
-	lsl    r16      ; 2 chars/byte                                                $\
+	lpm    r23, z   ; r23 is the length of the argument                           $\
 	                                                                              $\
 	movw   zl, yl   ; prepare for ijmp to real printing routine                   $\
 	lds    yl, __printf_arg_ptr+1                                                 $\
@@ -351,41 +349,44 @@ DEF_LABELED(__printf_prepare,                                                   
 DEF_LABELED(__printf_x,                                                         $\
 	; determine capitals/non-capitals                                             $\
 	movw   zl, xl                                                                 $\
-	ld     r23, z                                                                 $\
+	ld     r22, z                                                                 $\
 	cpse   r08, r01                                                               $\
-	lpm    r23, z                                                                 $\
-	subi   r23, 0x0a + '0' + 'x' - 'a'                                            $\
+	lpm    r22, z                                                                 $\
+	subi   r22, 0x0a + '0' + 'x' - 'a'                                            $\
 	                                                                              $\
 	ldi    zl, low(__printf_work_area)                                            $\
 	ldi    zh, high(__printf_work_area)                                           $\
+	mov    r16, r23                                                               $\
+	lsl    r16      ; 2 chars/byte                                                $\
+	                                                                              $\
+__printf_x_next_byte:                                                           $\
+	ld     r25, y   ; separate register makes __printf_d work,                    $\
+	ld     r24, y   ; uses overlapping src/dst.                                   $\
 	                                                                              $\
 	; high nibble                                                                 $\
-__printf_x_next_byte:                                                           $\
-	ld     r25, y                                                                 $\
 	lsr    (r25, 4)                                                               $\
 	andi   r25, 0x0f                                                              $\
 	cpi    r25, 0x0a                                                              $\
 	brlo   __printf_x_next_byte_high                                              $\
-	add    r25, r23                                                               $\
+	add    r25, r22                                                               $\
 __printf_x_next_byte_high:                                                      $\
 	subi   r25, -'0'                                                              $\
 	st     z, r25                                                                 $\
 	adiw   zl, 1                                                                  $\
 	                                                                              $\
 	; low nibble                                                                  $\
-	ld     r25, y                                                                 $\
-	andi   r25, 0x0f                                                              $\
-	cpi    r25, 0x0a                                                              $\
+	andi   r24, 0x0f                                                              $\
+	cpi    r24, 0x0a                                                              $\
 	brlo   __printf_x_next_byte_low                                               $\
-	add    r25, r23                                                               $\
+	add    r24, r22                                                               $\
 __printf_x_next_byte_low:                                                       $\
-	subi   r25, -'0'                                                              $\
-	st     z, r25                                                                 $\
+	subi   r24, -'0'                                                              $\
+	st     z, r24                                                                 $\
 	adiw   zl, 1                                                                  $\
 	                                                                              $\
 	; done?                                                                       $\
 	adiw   yl, 1                                                                  $\
-	dec    r24                                                                    $\
+	dec    r23                                                                    $\
 	brne   __printf_x_next_byte                                                   $\
 	                                                                              $\
 	sts    __printf_arg_ptr+1, yl                                                 $\
