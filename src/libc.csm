@@ -402,6 +402,10 @@ DEF_LABELED(__printf_write_work_area_and_resume,                                
 
 DEF_LABELED(__printf_variables,                                                 $\
 	.dseg                                                                         $\
+	; Note:                                                                       $\
+	; The work area is allocated separately, so that we do not have to wait for   $\
+	; serial TX end before returning from printf() when the last thing to print   $\
+	; was a format specifier.                                                     $\
 __printf_arg_ptr:   .byte 2                                                     $\
 __printf_work_area: .byte 8                                                     $\
 )
