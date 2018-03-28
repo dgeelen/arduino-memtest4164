@@ -282,6 +282,12 @@ __printf_ret_error:                                                             
 __printf_done:                                                                  $\
 	cpse   r16, r00                                                               $\
 	rcall  __printf_serial_write ; print any remaining chars                      $\
+	                                                                              $\
+	; when printing from RAM, the user buffer may not be used after exiting so    $\
+	; we need to wait with exiting until we are done using it.                    $\
+	cpse   r08, r00                                                               $\
+	rcall  serial_wait_tx_complete                                                $\
+	                                                                              $\
 	/*puts(hash)*/                                                                $\
 	restore_registers(                                                            \
 		r08, r09,                                                                   \
