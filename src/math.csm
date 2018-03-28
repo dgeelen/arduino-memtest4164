@@ -1,0 +1,228 @@
+/******************************************************************************
+
+   This file contains math functions.
+
+ ******************************************************************************/
+#pragma once
+
+#include "utility_macros.csm"
+#include "instructions.csm"
+#include <boost/preprocessor/cat.hpp>
+
+
+/**
+ * Given a (constant) size of an integer type, returns how many bytes would be
+ * needed to encode the largest representable number.
+ */
+#define bcd_encoded_length_bytes(n) \
+	/* two BCD decimals can be stored in one byte */ \
+	((BOOST_PP_CAT(__bcd_encoded_length_decimal_places_, n)+1)/2)
+
+
+/**
+ * Given a (constant) size of an integer type, returns how many decimal places
+ * would be needed to encode the largest representable number.
+ */
+#define __bcd_encoded_length_decimal_places_0  0
+#define __bcd_encoded_length_decimal_places_1  3
+#define __bcd_encoded_length_decimal_places_2  5
+#define __bcd_encoded_length_decimal_places_3  8
+#define __bcd_encoded_length_decimal_places_4 10
+#define bcd_encoded_length_decimal_places(n) BOOST_PP_CAT(__bcd_encoded_length_decimal_places_, n)
+
+
+; in: X points to char/short/int
+;     r16 indicates length of X
+;     Y points to output buffer of bcd_encoded_length(r16)
+;
+; reference: https://en.wikipedia.org/wiki/Double_dabble
+DEF_LABELED(bin2bcd,                                                            $\
+	save_registers(                                                                \
+		r22, r23,                                                                    \
+		zl, zh                                                                       \
+	)                                                                             $\
+	                                                                              $\
+	; reserve some scratch space                                                  $\
+	stack_reserve(4, r25)                                                         $\
+	                                                                              $\
+	; copy input to scratch                                                       $\
+	in     zl, spl                                                                $\
+	in     zh, sph                                                                $\
+	ldi    r24, 4+1       ; input needs to be placed at the 'end' of the scratch, $\
+	sub    r24, r16       ; plus one because SP points to first free byte         $\
+	add    zl, r24                                                                $\
+	adc    zh, r00                                                                $\
+	mov    r24, r16                                                               $\
+__bin2bcd_copy_src:                                                             $\
+	ld     r25, x+                                                                $\
+	st     z+, r25                                                                $\
+	dec    r24                                                                    $\
+	brne   __bin2bcd_copy_src                                                     $\
+	sub    xl, r16       ; restore x                                              $\
+	sbc    xh, r00                                                                $\
+	                                                                              $\
+	; figure out length of result                                                 $\
+	ldi    zl, low(2*__bin2bcd_dst_bytes_lookup)                                  $\
+	ldi    zh, high(2*__bin2bcd_dst_bytes_lookup)                                 $\
+	add    zl, r16                                                                $\
+	adc    zh, r00                                                                $\
+	lpm    r23, z                                                                 $\
+	                                                                              $\
+	mov    r24, r23                                                               $\
+__bin2bcd_clear_dst:                                                            $\
+	st     y+, r00                                                                $\
+	dec    r24                                                                    $\
+	brne   __bin2bcd_clear_dst                                                    $\
+	sub    yl, r23       ; restore y                                              $\
+	sbc    yh, r00                                                                $\
+	                                                                              $\
+	mov    r22, r16      ; how many bits to process total                         $\
+	lsl    (r22, 3)      ; N*8                                                    $\
+	                                                                              $\
+__bin2bcd:                                                                      $\
+	; adjust BCD (separate step because this clobbers carry)                      $\
+	; needs to be done _before_ shifting                                          $\
+	; Note:                                                                       $\
+	; this leaves Y at the end of the output, which is just what is needed for    $\
+	; the shift (rtl) below. How convenient!                                      $\
+	mov    r24, r23                                                               $\
+__bin2bcd_bcd_adjust_output:                                                    $\
+	ld     zl, y                                                                  $\
+	mov    zh, zl                                                                 $\
+	andi   zl, 0x0f                                                               $\
+	cpi    zl, 0x05     ; if > 4                                                  $\
+	brlo   __bin2bcd_bcd_adjust_no_add_lo                                         $\
+	subi   zl, -0x03    ; add 3                                                   $\
+__bin2bcd_bcd_adjust_no_add_lo:                                                 $\
+	andi   zh, 0xf0                                                               $\
+	cpi    zh, 0x50     ; if > 4                                                  $\
+	brlo   __bin2bcd_bcd_adjust_no_add_hi                                         $\
+	subi   zh, -0x30    ; add 3                                                   $\
+__bin2bcd_bcd_adjust_no_add_hi:                                                 $\
+	or     zl, zh                                                                 $\
+	st     y+, zl                                                                 $\
+	dec    r24                                                                    $\
+	brne   __bin2bcd_bcd_adjust_output                                            $\
+	                                                                              $\
+	; shift input                                                                 $\
+	in     zl, spl                                                                $\
+	in     zh, sph                                                                $\
+	adiw   zl, 5         ; +4, but pre-decrement below. Note that because we use  $\
+	mov    r24, r16      ; SP, an addition is always required here.               $\
+	clc                                                                           $\
+__bin2bcd_shift_input:                                                          $\
+	ld     r25, -z                                                                $\
+	rol    r25                                                                    $\
+	st     z, r25                                                                 $\
+	dec    r24           ; careful with the carry...                              $\
+	brne   __bin2bcd_shift_input ; we shifted all input bytes                     $\
+	                                                                              $\
+	; shift input msb (now in carry) into BCD                                     $\
+	mov    r24, r23                                                               $\
+__bin2bcd_shift_output:                                                         $\
+	ld     r25, -y                                                                $\
+	rol    r25                                                                    $\
+	st     y, r25                                                                 $\
+	dec    r24           ; careful with the carry...                              $\
+	brne   __bin2bcd_shift_output ; we shifted all output bytes                   $\
+	                                                                              $\
+	; next round                                                                  $\
+	dec    r22                                                                    $\
+	brne   __bin2bcd                                                              $\
+	                                                                              $\
+__bin2bcd_done:                                                                 $\
+	stack_free(4, r25)                                                            $\
+	restore_registers(                                                             \
+		r22, r23,                                                                    \
+		zl, zh                                                                       \
+	)                                                                             $\
+	ret                                                                           $\
+	                                                                              $\
+__bin2bcd_dst_bytes_lookup: ; for speed                                         $\
+	.db bcd_encoded_length_bytes(0),                                               \
+	    bcd_encoded_length_bytes(1),                                               \
+	    bcd_encoded_length_bytes(2),                                               \
+	    bcd_encoded_length_bytes(3),                                               \
+	    bcd_encoded_length_bytes(4),                                               \
+	    bcd_encoded_length_bytes(0), /* dummy */                                   $\
+	                                                                              $\
+__bin2bcd_dst_nibbles_lookup: ; for accuracy                                    $\
+	.db bcd_encoded_length_decimal_places(0),                                      \
+	    bcd_encoded_length_decimal_places(1),                                      \
+	    bcd_encoded_length_decimal_places(2),                                      \
+	    bcd_encoded_length_decimal_places(3),                                      \
+	    bcd_encoded_length_decimal_places(4),                                      \
+	    bcd_encoded_length_decimal_places(0), /* dummy */                         $\
+)
+
+
+/**
+ * Input:
+ *   r16 no. bytes
+ * output:
+ *   r25 no. nibbles
+ */
+DEF_LABELED(bcd2bin_nibbles,                                                    $\
+	save_registers(zl, zh)                                                        $\
+	                                                                              $\
+	ldi    zl, low(2*__bin2bcd_dst_nibbles_lookup)                                $\
+	ldi    zh, high(2*__bin2bcd_dst_nibbles_lookup)                               $\
+	add    zl, r16                                                                $\
+	adc    zh, r00                                                                $\
+	lpm    r25, z                                                                 $\
+	                                                                              $\
+	restore_registers(zl, zh)                                                     $\
+	ret                                                                           $\
+)
+
+
+/**
+ * Input:
+ *   r16 no. bytes
+ * output:
+ *   r25 no. bytes
+ */
+DEF_LABELED(bcd2bin_bytes,                                                      $\
+	save_registers(zl, zh)                                                        $\
+	                                                                              $\
+	ldi    zl, low(2*__bin2bcd_dst_bytes_lookup)                                  $\
+	ldi    zh, high(2*__bin2bcd_dst_bytes_lookup)                                 $\
+	add    zl, r16                                                                $\
+	adc    zh, r00                                                                $\
+	lpm    r25, z                                                                 $\
+	                                                                              $\
+	restore_registers(zl, zh)                                                     $\
+	ret                                                                           $\
+)
+
+
+/**
+ * In:
+ * X BCD sequence
+ * r16 length (bytes? nibbles?)
+ * Y output buffer
+ */
+DEF_LABELED(bcd2ascii,                                                          $\
+	mov    r24, r16                                                               $\
+__bcd2ascii:                                                                    $\
+	ld     r25, x                                                                 $\
+	lsr    (r25, 4)                                                               $\
+	subi   r25, -'0'                                                              $\
+  st     y+, r25                                                                $\
+	ld     r25, x+                                                                $\
+	andi   r25, 0x0f                                                              $\
+	subi   r25, -'0'                                                              $\
+	st     y+, r25                                                                $\
+	dec    r24                                                                    $\
+	brne   __bcd2ascii                                                            $\
+	                                                                              $\
+	; restore X and Y (2 cycles faster than push/pop)                             $\
+	mov    r24, r16                                                               $\
+	sub    xl, r16                                                                $\
+	sbc    xh, r00                                                                $\
+	lsl    r24                                                                    $\
+	sub    yl, r24                                                                $\
+	sbc    yh, r00                                                                $\
+	                                                                              $\
+	ret                                                                           $\
+)
