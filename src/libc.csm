@@ -345,7 +345,7 @@ DEF_LABELED(__printf_serial_write,                                              
 DEF_LABELED(__printf_prepare,                                                   $\
 	; save pointer to format string, ready format routine pointer (swap y and z)  $\
 	; Note: at this point z points *at*  'x'                                      $\
-	movw  xl, zl                                                                 $\
+	movw  xl, zl                                                                  $\
 	                                                                              $\
 	; determine argument length (bytes)                                           $\
 	; it seems that the calculation is probably faster/easier than a lookup table $\
@@ -358,14 +358,42 @@ DEF_LABELED(__printf_prepare,                                                   
 	adc    zh, r00                                                                $\
 	lpm    r23, z   ; r23 is the length of the argument                           $\
 	                                                                              $\
-	movw   zl, yl   ; prepare for ijmp to real printing routine                   $\
+	movw   zl, yl   ; prepare for icall to real printing routine                  $\
 	lds    yl, __printf_arg_ptr+1                                                 $\
 	lds    yh, __printf_arg_ptr+0                                                 $\
 	                                                                              $\
 	; We are about to (re)use the (shared) __printf_work_area                     $\
 	call   serial_wait_tx_complete                                                $\
 	                                                                              $\
-	ijmp                                                                          $\
+	icall  ; do actual formatting                                                 $\
+	                                                                              $\
+	; update arg ptr                                                              $\
+	sts    __printf_arg_ptr+1, yl                                                 $\
+	sts    __printf_arg_ptr+0, yh ; next argument                                 $\
+	                                                                              $\
+	; write buffer (r16 is set correctly above)                                   $\
+	; at this point xl = current pos, __printf_serial_ preserves z,               $\
+	; and z needs to be restored before exit                                      $\
+	movw   zl, xl         ; restore z                                             $\
+	ldi    yl, low(__printf_work_area)                                            $\
+	ldi    yh, high(__printf_work_area) ; __printf_serial_write needs ptr in y    $\
+	mov    r22, r08       ; r22 is not needed anymore (for this format specifier) $\
+	mov    r08, r01       ; always write from ram (__printf_work_area)            $\
+	; r16 must always > 0 here                                                    $\
+	rcall  __printf_serial_write                                                  $\
+	mov    r08, r22                                                               $\
+	                                                                              $\
+	; switch back to normal printing                                              $\
+	andi   r23, BITINV(__printf_conversion_specifier_mask)                        $\
+	; zl already points at the current position                                   $\
+	; but yl points at the work area rather than the start of the current seq.    $\
+	movw   yl, zl                                                                 $\
+	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
+	adiw   yl, 1          ; which will overflow r16 to 0 and inc zl, but for yl   $\
+	ldi    r25, '%'      ;                                                        $\
+	ldi    r22, 2        ; r22 will be flags; lower 3 bits indicate length        $\
+	clr    r23           ; r23 will be 'in conversion specifier' + type?          $\
+	rjmp   __printf_next_char ; we have to do it here.                            $\
 )
 
 
@@ -395,12 +423,19 @@ DEF_LABELED(__printf_d,                                                         
 	; xl should point to current char                                             $\
 	; yl already points to (our) arg                                              $\
 	; zl should point to work area                                                $\
-	movw   xl, zl                                                                 $\
-	ldi    zl, low(__printf_work_area) ; yl points to output buf                  $\
+	add    xl, r16                                                                $\
+	adc    xh, r00  ; we will use up this many bytes of the input                 $\
+	push   xl                                                                     $\
+	push   xh       ; save (updated) original arg ptr                             $\
+	movw   xl, zl   ; x points to current char                                    $\
+	ldi    zl, low(__printf_work_area) ; z points to output buf                   $\
 	ldi    zh, high(__printf_work_area)                                           $\
-	lsl    r23 /* 'correct' arglen for bcd encoded number: 2 chars/byte */        $\
-	mov    r16, r23                                                               $\
-	rjmp   __printf_x_next_byte                                                   $\
+	call   __printf_x_d_insertion_point                                           $\
+	                                                                              $\
+	; restore                                                                     $\
+	pop    yh       ; restore arg ptr                                             $\
+	pop    yl                                                                     $\
+	ret                                                                           $\
 )
 
 
@@ -412,6 +447,7 @@ DEF_LABELED(__printf_x,                                                         
 	lpm    r22, z                                                                 $\
 	subi   r22, 0x0a + '0' + 'x' - 'a'                                            $\
 	                                                                              $\
+	__printf_x_d_insertion_point:                                                 $\
 	ldi    zl, low(__printf_work_area)                                            $\
 	ldi    zh, high(__printf_work_area)                                           $\
 	mov    r16, r23                                                               $\
@@ -447,32 +483,7 @@ __printf_x_next_byte_low:                                                       
 	dec    r23                                                                    $\
 	brne   __printf_x_next_byte                                                   $\
 	                                                                              $\
-	sts    __printf_arg_ptr+1, yl                                                 $\
-	sts    __printf_arg_ptr+0, yh ; next argument                                 $\
-	rjmp   __printf_write_work_area_and_resume                                    $\
-)
-
-DEF_LABELED(__printf_write_work_area_and_resume,                                $\
-	; write buffer (r16 is set correctly above)                                   $\
-	; at this point xl = current pos, __printf_serial_ preserves z,               $\
-	; and z needs to be restored before exit                                      $\
-	movw   zl, xl         ; restore z                                             $\
-	ldi    yl, low(__printf_work_area)                                            $\
-	ldi    yh, high(__printf_work_area) ; __printf_serial_write needs ptr in y    $\
-	mov    r22, r08       ; r22 is not needed anymore (for this format specifier) $\
-	mov    r08, r01       ; always write from ram (__printf_work_area)            $\
-  ; r16 must always > 0 here                                                    $\
-	rcall  __printf_serial_write                                                  $\
-	mov    r08, r22                                                               $\
-	                                                                              $\
-	; switch back to normal printing                                              $\
-	andi   r23, BITINV(__printf_conversion_specifier_mask)                        $\
-	; zl already points at the current position                                   $\
-	; but yl points at the work area rather than the start of the current seq.    $\
-	movw   yl, zl                                                                 $\
-	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
-	adiw   yl, 1          ; which will overflow r16 to 0 and inc zl, but for yl   $\
-	rjmp   __printf_next_char ; we have to do it here.                            $\
+	ret                                                                           $\
 )
 
 DEF_LABELED(__printf_constants,                                                 $\
