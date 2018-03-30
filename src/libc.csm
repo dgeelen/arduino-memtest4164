@@ -282,20 +282,20 @@ __printf_conversion_format_specifier_d:                                         
 	ldi    yh, high(__printf_d)                                                   $\
 	ldi    r24, 'd'                                                               $\
 	cp     r25, r24                                                               $\
-	breq   __printf_prepare                                                       $\
+	breq   __printf_do_format                                                     $\
 	ldi    r24, 'D'                                                               $\
 	cp     r25, r24                                                               $\
-	breq   __printf_prepare                                                       $\
+	breq   __printf_do_format                                                     $\
 	                                                                              $\
 __printf_conversion_format_specifier_x:                                         $\
 	ldi    yl, low(__printf_x)                                                    $\
 	ldi    yh, high(__printf_x)                                                   $\
 	ldi    r24, 'x'                                                               $\
 	cp     r25, r24                                                               $\
-	breq   __printf_prepare                                                       $\
+	breq   __printf_do_format                                                     $\
 	ldi    r24, 'X'                                                               $\
 	cp     r25, r24                                                               $\
-	breq   __printf_prepare                                                       $\
+	breq   __printf_do_format                                                     $\
 	                                                                              $\
 	; Nothing valid matched in conversion format specifier                        $\
 	rjmp   __printf_conversion_specifier_error                                    $\
@@ -342,7 +342,7 @@ DEF_LABELED(__printf_serial_write,                                              
 	ret                                                                           $\
 )
 
-DEF_LABELED(__printf_prepare,                                                   $\
+DEF_LABELED(__printf_do_format,                                                 $\
 	; save pointer to format string, ready format routine pointer (swap y and z)  $\
 	; Note: at this point z points *at*  'x'                                      $\
 	movw  xl, zl                                                                  $\
