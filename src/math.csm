@@ -226,3 +226,61 @@ __bcd2ascii:                                                                    
 	                                                                              $\
 	ret                                                                           $\
 )
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+; divides two unsigned 16-bit numbers
+; dividend is in r16:r17 (low:high)
+; divisor is in r18:r19 (low:high)
+; quotient is placed in r16:r17 (low:high)
+; remainder is placed in r24:r25 (low:high)
+;
+; I.e. r16:r17 = r16:17/r18:r19, r18:r19 = r16:17%r18:r19
+;
+; based on https://www.avrfreaks.net/forum/asm200-maths-apnotes?name=PNphpBB2&file=viewtopic&t=4716
+DEF_LABELED(div_u16,                                                            $\
+	save_registers(r23)                                                           $\
+	ldi   r23, 17      ; number of bits (iterations)                              $\
+	clr   r24          ; r24:r25 will be quotient                                 $\
+	sub   r25, r25     ; sub clears both the reg *and* C                          $\
+	                                                                              $\
+__div_u16_next_bit:                                                             $\
+	; We shift bits from the dividend r16:r17 into the work area r24:r25, while   $\
+	; at the same time we shift bits from the quotient into r16:r17.              $\
+	rol   r16                                                                     /*  1 */$\
+	rol   r17                                                                     /*  2 */$\
+	                                                                              $\
+	; After all 16 input bits are handled we are done. The exit check is placed   $\
+	; between the rols because the first two rols record the bits of the          $\
+	; quotient, and after the last bit is processed we dont need to shift any     $\
+	; more bits into the work area. I.e. this yields a minor speed improvement.   $\
+	dec   r23                                                                     /*  3 */$\
+	breq  __div_u16_done                                                          /*  4 */$\
+	                                                                              $\
+	rol   r24                                                                     /*  5 */$\
+	rol   r25                                                                     /*  6 */$\
+	                                                                              $\
+	; Try to subtract the divisor                                                 $\
+	sub   r24, r18                                                                /*  7 */$\
+	sbc   r25, r19                                                                /*  8 */$\
+	                                                                              $\
+	; I.e. if the subtraction succeeded (no borrow needed) the number in the work $\
+	; area is at least as large as the divider, and so we should place a 1 into   $\
+	; the quotient. Otherwise we need to undo the subtraction and  place a 0 into $\
+	; the quotient.                                                               $\
+	; Note that we are storing the inverse, and will flip the bits at the end.    $\
+	brbc  SREG_C, __div_u16_next_bit                                              /*  9.5 */$\
+	add   r24, r18                                                                /* 10.5 */$\
+	adc   r25, r19                                                                /* 11.5 */$\
+	rjmp  __div_u16_next_bit                                                      /* 12.5 */$\
+	                                                                              $\
+__div_u16_done:                                                                 $\
+	eor   r16, r02 ; quotient                                                     $\
+	eor   r17, r02                                                                $\
+	mov   r18, r24 ; remainder                                                    $\
+	mov   r19, r25                                                                $\
+	restore_registers(r23)                                                        $\
+	ret                                                                           $\
+) // div_u16
