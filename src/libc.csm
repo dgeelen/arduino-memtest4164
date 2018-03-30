@@ -380,13 +380,14 @@ DEF_LABELED(__printf_prepare,                                                   
 ; r21 = free (unused)
 ; r20 = free (unused)
 DEF_LABELED(__printf_d,                                                         $\
+	mov    r16, r23 ; arg len                                                     $\
+	call   bcd2bin_bytes                                                          $\
+	mov    r23, r25 ; change arg len to match with bcd encoded arg                $\
+	                                                                              $\
 	movw   zl, xl   ; save current char ptr                                       $\
 	movw   xl, yl   ; xl points to arg                                            $\
-	mov    r16, r23 ; arg len                                                     $\
 	ldi    yl, low(__printf_work_area_end)                                        $\
 	ldi    yh, high(__printf_work_area_end)                                       $\
-	call   bcd2bin_bytes                                                          $\
-	mov    r23, r25 ; save (see below)                                            $\
 	add    yl, r24  ; yl points to output buf                                     $\
 	call   bin2bcd                                                                $\
 	                                                                              $\
