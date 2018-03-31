@@ -243,7 +243,7 @@ __bcd2ascii:                                                                    
 DEF_LABELED(div_u16,                                                            $\
 	save_registers(r23)                                                           $\
 	ldi   r23, 17      ; number of bits (iterations)                              $\
-	clr   r24          ; r24:r25 will be quotient                                 $\
+	clr   r24          ; r24:r25 will be remainder                                $\
 	sub   r25, r25     ; sub clears both the reg *and* C                          $\
 	                                                                              $\
 __div_u16_next_bit:                                                             $\
