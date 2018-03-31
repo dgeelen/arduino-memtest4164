@@ -44,18 +44,18 @@ main:
 
 
 loop:
-	mov   r16, r01
-	ldi   zl, low(serial_rx_byte)
-	ldi   zh, high(serial_rx_byte)
+	mov    r16, r01
+	ldi    zl, low(serial_rx_byte)
+	ldi    zh, high(serial_rx_byte)
 	call  serial_read
 
-	lds   r25, serial_rx_byte
-	push  r25
-	ldi   r25, low(read_byte)
-	push  r25
-	ldi   r25, high(read_byte)
-	push  r25
-	call  _printf
+	lds    r25, serial_rx_byte
+	push   r25
+	ldi    r25, low(read_byte)
+	push   r25
+	ldi    r25, high(read_byte)
+	push   r25
+	call   _printf
 	stack_free(3, r25)
 	rjmp  loop
 
