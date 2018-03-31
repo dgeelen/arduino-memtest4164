@@ -18,21 +18,21 @@ ISR_SET_ORG_FOR_USER_CODE()
 
 main:
 	; set up the stack
-	ldi r25, low(RAMEND)
-	out SPL, r25
-	ldi r25, high(RAMEND)
-	out SPH, r25
+	ldi    r25, low(RAMEND)
+	out    SPL, r25
+	ldi    r25, high(RAMEND)
+	out    SPH, r25
 
 	clear_all_registers()
 
 	; r00 is always 0x00
 	; r01 is always 0x01
 	; r02 is always 0xff
-	eor r00, r00
-	mov r01, r00
-	mov r02, r00
-	inc r01
-	dec r02
+	eor    r00, r00
+	mov    r01, r00
+	mov    r02, r00
+	inc    r01
+	dec    r02
 
 	call _serial_init
 	sei
