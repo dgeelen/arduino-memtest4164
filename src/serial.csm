@@ -44,6 +44,7 @@
 #include "string_constant.csm"
 #include "interrupts.csm"
 #include "instructions.csm"
+#include "math.csm"
 
 
 #define F_CPU 16000000
@@ -91,6 +92,18 @@ DEF_LABELED(_serial_init,                                                       
 	call serial_tx_enable                                                         $\
 	ret                                                                           $\
 )
+
+#define serial_init(baud_rate) DEF_LABELED(serial_init,                         $\
+	save_registers(r16, r17, r18, r19)                                            $\
+	ldi    r16, BYTE1(baud_rate)                                                  $\
+	ldi    r17, BYTE2(baud_rate)                                                  $\
+	ldi    r18, BYTE3(baud_rate)                                                  $\
+	ldi    r19, BYTE4(baud_rate)                                                  $\
+	call   _serial_init                                                           $\
+	restore_registers(r16, r17, r18, r19)                                         $\
+)
+
+
 
 .dseg
 __serial_rx_var_begin:
@@ -158,21 +171,53 @@ DEF_LABELED(__serial_udri_disable,                                              
 )
 
 
-; z: baudrate
+; r16:r17:r18:r19: baudrate (low-->high)
 DEF_LABELED(serial_set_baudrate,                                                $\
+	save_registers(xl, xh, yl, yh, zl, zh, r16, r17, r18, r19)                    $\
+	stack_reserve(16, r24, r25, xl)                                               $\
+	                                                                              $\
 	; Compute baudrate settings:                                                  $\
 	; setting = (F_CPU / 4 / (baudrate) - 1) / 2                                  $\
 	;         = (F_CPU / (4 * baudrate) - 1) / 2                                  $\
-	                                                                              $\
-	                                                                              $\
+	rol    r16                                                                    $\
+	rol    r17                                                                    $\
+	rol    r18                                                                    $\
+	rol    r19                                                                    $\
+	rol    r16                                                                    $\
+	rol    r17                                                                    $\
+	rol    r18                                                                    $\
+	rol    r19                                                                    $\
+	andi   r16, 0xfc ; instead of 2x clc                                          $\
+	in     zl, SPL                                                                $\
+	in     zh, SPH                                                                $\
+	adiw   zl, 1                                                                  $\
+	movw   xl, zl                                                                 $\
+	ldi    r25, BYTE4(F_CPU)                                                      $\
+	st     z+, r25                                                                $\
+	ldi    r25, BYTE3(F_CPU)                                                      $\
+	st     z+, r25                                                                $\
+	ldi    r25, BYTE2(F_CPU)                                                      $\
+	st     z+, r25                                                                $\
+	ldi    r25, BYTE1(F_CPU)                                                      $\
+	st     z+, r25                                                                $\
+	movw   yl, zl                                                                 $\
+	st     z+, r19                                                                $\
+	st     z+, r18                                                                $\
+	st     z+, r17                                                                $\
+	st     z+, r16                                                                $\
+	call   div_u32                                                                $\
+	adiw   zl, 2                                                                  $\
+	ld     r25, z+                                                                $\
+	ld     r24, z+ ; r24:r25 = F_CPU/(baud_rate*4)                                $\
+	sbiw   r24, 1                                                                 $\
+	clc                                                                           $\
+	ror    r25                                                                    $\
+	ror    r24                                                                    $\
 	                                                                              $\
 	; Configure the baudrate                                                      $\
-	;ldi   r25, high((F_CPU / 4 / (baudrate) - 1) / 2) & 0x0F; mask reserved bits  $\
-	ldi r25, 0                                                                    $\
-	sts   UBRR0H, r25 ; Memory mapped                                             $\
-	;ldi   r25, low((F_CPU / 4 / (baudrate) - 1) / 2)                              $\
-	ldi r25, 207                                                                  $\
-	sts   UBRR0L, r25 ; Memory mapped                                             $\
+	andi   r25, 0x0F   ; mask reserved bits                                       $\
+	sts    UBRR0L, r24 ; Memory mapped                                            $\
+	sts    UBRR0H, r25 ; Memory mapped                                            $\
 	                                                                              $\
 	; Configure (enable) double-rate and Multi-processor communication mode       $\
 	; Works in conjunction with the above baudrate configuration (/2)             $\
@@ -180,6 +225,9 @@ DEF_LABELED(serial_set_baudrate,                                                
 	andi  r25, BITINV(1<<U2X0 | 1<<MPCM0)                                         $\
 	ori   r25, 1<<U2X0                                                            $\
 	sts   UCSR0A, r25                                                             $\
+	                                                                              $\
+	stack_free(16, r24, r25, xl)                                                  $\
+	restore_registers(xl, xh, yl, yh, zl, zh, r16, r17, r18, r19)                 $\
 	ret                                                                           $\
 )
 

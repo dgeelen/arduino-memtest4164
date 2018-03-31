@@ -34,7 +34,7 @@ main:
 	inc    r01
 	dec    r02
 
-	call _serial_init
+	serial_init(115200)
 	sei
 
 .dseg
