@@ -231,20 +231,22 @@ __bcd2ascii:                                                                    
 ////////////////////////////////////////////////////////////////////////////////
 
 
-; divides two unsigned 16-bit numbers
-; dividend is in r16:r17 (low:high)
-; divisor is in r18:r19 (low:high)
-; quotient is placed in r16:r17 (low:high)
-; remainder is placed in r24:r25 (low:high)
-;
-; I.e. r16:r17 = r16:17/r18:r19, r18:r19 = r16:17%r18:r19
+; divides two unsigned 16-bit numbers pointed to by x and y (X/Y).
+; Result is stored at Z, dividend:remainder (4 bytes).
 ;
 ; based on https://www.avrfreaks.net/forum/asm200-maths-apnotes?name=PNphpBB2&file=viewtopic&t=4716
 DEF_LABELED(div_u16,                                                            $\
-	save_registers(r23)                                                           $\
-	ldi   r23, 17      ; number of bits (iterations)                              $\
-	clr   r24          ; r24:r25 will be remainder                                $\
-	sub   r25, r25     ; sub clears both the reg *and* C                          $\
+	save_registers(r16, r17, r18, r19, r20)                                       $\
+	ldi   r20, 17      ; number of bits (iterations)                              $\
+	                                                                              $\
+	ld    r17, x+      ; msb                                                      $\
+	ld    r16, x+      ; lsb                                                      $\
+	sbiw  xl, 2                                                                   $\
+	ld    r19, y+                                                                 $\
+	ld    r18, y+                                                                 $\
+	sbiw  yl, 2                                                                   $\
+	clr   r25                                                                     $\
+	sub   r24, r24     ; zero and clc                                             $\
 	                                                                              $\
 __div_u16_next_bit:                                                             $\
 	; We shift bits from the dividend r16:r17 into the work area r24:r25, while   $\
@@ -256,7 +258,7 @@ __div_u16_next_bit:                                                             
 	; between the rols because the first two rols record the bits of the          $\
 	; quotient, and after the last bit is processed we dont need to shift any     $\
 	; more bits into the work area. I.e. this yields a minor speed improvement.   $\
-	dec   r23                                                                     /*  3 */$\
+	dec   r20                                                                     /*  3 */$\
 	breq  __div_u16_done                                                          /*  4 */$\
 	                                                                              $\
 	rol   r24                                                                     /*  5 */$\
@@ -279,9 +281,12 @@ __div_u16_next_bit:                                                             
 __div_u16_done:                                                                 $\
 	eor   r16, r02 ; quotient                                                     $\
 	eor   r17, r02                                                                $\
-	mov   r18, r24 ; remainder                                                    $\
-	mov   r19, r25                                                                $\
-	restore_registers(r23)                                                        $\
+	st    z+, r17                                                                 $\
+	st    z+, r16                                                                 $\
+	st    z+, r19  ; remainder                                                    $\
+	st    z+, r18                                                                 $\
+	sbiw  zl, 4                                                                   $\
+	restore_registers(r16, r17, r18, r19, r20)                                    $\
 	ret                                                                           $\
 ) // div_u16
 
