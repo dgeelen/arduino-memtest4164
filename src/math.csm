@@ -284,3 +284,75 @@ __div_u16_done:                                                                 
 	restore_registers(r23)                                                        $\
 	ret                                                                           $\
 ) // div_u16
+
+
+; divides two unsigned 32-bit numbers pointed to be x and y (X/Y).
+; Result is stored at Z, dividend:remainder (8 bytes).
+;
+; Functionally identical to the above 16bit divide.
+DEF_LABELED(div_u32,                                                            $\
+	save_registers(                                                                \
+		r08, r09, r10, r11                                                           \
+		r12, r13, r14, r15                                                           \
+		r16, r17, r18, r19                                                           \
+	)                                                                             $\
+	ldi   r24, 33      ; number of bits (iterations)                              $\
+	                                                                              $\
+	ld    r11, x+      ; msb                                                      $\
+	ld    r10, x+                                                                 $\
+	ld    r09, x+                                                                 $\
+	ld    r08, x+      ; lsb                                                      $\
+	sbiw  xl, 4                                                                   $\
+	ld    r15, y+                                                                 $\
+	ld    r14, y+                                                                 $\
+	ld    r13, y+                                                                 $\
+	ld    r12, y+                                                                 $\
+	sbiw  yl, 4                                                                   $\
+	clr   r19                                                                     $\
+	clr   r18                                                                     $\
+	clr   r17                                                                     $\
+	sub   r16, r16     ; zero and clc                                             $\
+	                                                                              $\
+__div_u32_next_bit:                                                             $\
+	rol   r08                                                          /*  1   */ $\
+	rol   r09                                                          /*  2   */ $\
+	rol   r10                                                          /*  3   */ $\
+	rol   r11                                                          /*  4   */ $\
+	dec   r24                                                          /*  5   */ $\
+	breq  __div_u32_done                                               /*  6   */ $\
+	rol   r16                                                          /*  7   */ $\
+	rol   r17                                                          /*  8   */ $\
+	rol   r18                                                          /*  9   */ $\
+	rol   r19                                                          /* 10   */ $\
+	sub   r16, r12                                                     /* 11   */ $\
+	sbc   r17, r13                                                     /* 12   */ $\
+	sbc   r18, r14                                                     /* 13   */ $\
+	sbc   r19, r15                                                     /* 14   */ $\
+	brbc  SREG_C, __div_u32_next_bit                                   /* 15.5 */ $\
+	add   r16, r12                                                     /* 16.5 */ $\
+	adc   r17, r13                                                     /* 17.5 */ $\
+	adc   r18, r14                                                     /* 18.5 */ $\
+	adc   r19, r15                                                     /* 19.5 */ $\
+	rjmp  __div_u32_next_bit                                           /* 20.5 */ $\
+	                                                                              $\
+__div_u32_done:                                                                 $\
+	eor   r08, r02 ; quotient                                                     $\
+	eor   r09, r02                                                                $\
+	eor   r10, r02                                                                $\
+	eor   r11, r02                                                                $\
+	st    z+, r11                                                                 $\
+	st    z+, r10                                                                 $\
+	st    z+, r09                                                                 $\
+	st    z+, r08                                                                 $\
+	st    z+, r19                                                                 $\
+	st    z+, r18                                                                 $\
+	st    z+, r17                                                                 $\
+	st    z+, r16                                                                 $\
+	sbiw  zl, 8                                                                   $\
+	restore_registers(                                                             \
+		r08, r09, r10, r11                                                           \
+		r12, r13, r14, r15                                                           \
+		r16, r17, r18, r19                                                           \
+	)                                                                             $\
+	ret                                                                           $\
+) // div_u32
