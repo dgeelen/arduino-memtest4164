@@ -489,7 +489,7 @@ III_ISEMPTY(                                                               \
 #define stack_manip___n_1(n, instr, tmp_reg_1, tmp_reg_2, tmp_reg_3)             \
 	in     tmp_reg_1, SPL                                                 /* 1 */ $\
 	in     tmp_reg_2, SPH                                                 /* 1 */ $\
-	adiw   tmp_reg_1, n                                                   /* 2 */ $\
+	instr  tmp_reg_1, n                                                   /* 2 */ $\
 	; The instruction following SEI will be executed before any pending           $\
 	; interrupts. By issuing the SEI one instruction 'early', we gain a           $\
 	; small improvement in latency by allowing interrupts to trigger              $\
