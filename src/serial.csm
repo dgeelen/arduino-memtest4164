@@ -221,10 +221,10 @@ DEF_LABELED(serial_set_baudrate,                                                
 	                                                                              $\
 	; Configure (enable) double-rate and Multi-processor communication mode       $\
 	; Works in conjunction with the above baudrate configuration (/2)             $\
-	lds   r25, UCSR0A ; Memory mapped                                             $\
-	andi  r25, BITINV(1<<U2X0 | 1<<MPCM0)                                         $\
-	ori   r25, 1<<U2X0                                                            $\
-	sts   UCSR0A, r25                                                             $\
+	lds    r25, UCSR0A ; Memory mapped                                            $\
+	andi   r25, BITINV(1<<U2X0 | 1<<MPCM0)                                        $\
+	ori    r25, 1<<U2X0                                                           $\
+	sts    UCSR0A, r25                                                            $\
 	                                                                              $\
 	stack_free(16, r24, r25, xl)                                                  $\
 	restore_registers(xl, xh, yl, yh, zl, zh, r16, r17, r18, r19)                 $\
