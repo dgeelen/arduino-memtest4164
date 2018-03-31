@@ -4,8 +4,6 @@
 .list                    // We DO want to include the following code in our listing ;D
 
 
-#include "utility_macros.csm"
-#include "utility_functions.csm"
 #include "interrupts.csm"
 
 ISR_SET_HANDLER(ISR_RESET,      main                               )
@@ -13,6 +11,8 @@ ISR_SET_HANDLER(ISR_USART_RX,   serial_interrupt_handler_rx        )
 ISR_SET_HANDLER(ISR_USART_UDRE, serial_interrupt_handler_data_empty)
 ISR_SET_ORG_FOR_USER_CODE()
 
+#include "utility_macros.csm"
+#include "utility_functions.csm"
 #include "serial.csm"
 #include "libc.csm"
 
