@@ -10,13 +10,19 @@
 /**
  * loads zeros into every register
  */
-#define clear_all_registers() DEF_LABELED( clear_all_registers,               $\
-  clr   ZH                                                                    $\
-  ldi   ZL, 0x1d /* 0x1d = YH */                                              $\
-clear_all_registers_next:                                                     $\
-  st    Z, ZH                                                                 $\
-  dec   ZL                                                                    $\
-  brne  clear_all_registers_next                                              $\
+#define initialise_registers() DEF_LABELED(initialise_registers,              $\
+  clr    ZH                                                                   $\
+  ldi    ZL, 0x1d /* 0x1d = YH */                                             $\
+__initialise_registers:                                                       $\
+  st     Z, ZH                                                                $\
+  dec    ZL                                                                   $\
+  brne   __initialise_registers                                               $\
+                                                                              $\
+  ; r00 is always 0x00                                                        $\
+  ; r01 is always 0x01                                                        $\
+  ; r02 is always 0xff                                                        $\
+  inc    r01                                                                  $\
+  dec    r02                                                                  $\
 )
 
 
