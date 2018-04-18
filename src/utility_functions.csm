@@ -21,6 +21,7 @@ __initialise_registers:                                                       $\
 	; r00 is always 0x00                                                        $\
 	; r01 is always 0x01                                                        $\
 	; r02 is always 0xff                                                        $\
+	clr    r00 ; skipped by the above loop...                                   $\
 	inc    r01                                                                  $\
 	dec    r02                                                                  $\
 )
