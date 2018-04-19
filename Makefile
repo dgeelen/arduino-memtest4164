@@ -130,8 +130,30 @@ $(DEPDIR)/%.d: $(SRCDIR)/%$(SOURCE_EXT)
 
 disassembly: $(TARGETS:.bin=.asm)
 
+# Simulation will generate a .VCD file
 simulation: $(TARGETS)
 	@echo "$(COLOR_CYAN)[ simavr    ]$(COLOR_RESET) Running simulation..."
+	@objcopy --input-target binary --output-target ihex $< $(TARGETS:.bin=_simavr.hex)
+#	PORTB=0x05, PORTD=0x0b, +32 = 0x25 & 0x2b
+	../simavr/simavr/run_avr --trace -v -v -v -v -v --mcu atmega328p --freq 16000000 -ff $(TARGETS:.bin=_simavr.hex) \
+		--vcd-trace-file $(BUILDDIR)/memtest4164.vcd                                \
+		--add-vcd-trace ~WE=trace@0x2b/0x04                                         \
+		--add-vcd-trace ~RAS=trace@0x2b/0x02                                        \
+		--add-vcd-trace ~CAS=trace@0x2b/0x08                                        \
+		--add-vcd-trace Din=trace@0x2b/0x10                                         \
+		--add-vcd-trace Dout=trace@0x2b/0x01                                        \
+		--add-vcd-trace A0=trace@0x25/0x01                                          \
+		--add-vcd-trace A1=trace@0x25/0x02                                          \
+		--add-vcd-trace A2=trace@0x25/0x04                                          \
+		--add-vcd-trace A3=trace@0x25/0x08                                          \
+		--add-vcd-trace A4=trace@0x25/0x10                                          \
+		--add-vcd-trace A5=trace@0x25/0x20                                          \
+		--add-vcd-trace A6=trace@0x25/0x40                                          \
+		--add-vcd-trace A7=trace@0x25/0x80
+
+# Simulation
+debug: $(TARGETS)
+	@echo "$(COLOR_CYAN)[ simavr    ]$(COLOR_RESET) Debugging..."
 # simavr only loads the last section in a .hex file, so we can't use the
 # regular (intermediate) hex file, we have to 'generate' a single-section hex
 # file from the binary
