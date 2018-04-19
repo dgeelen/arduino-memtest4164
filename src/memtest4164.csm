@@ -9,11 +9,13 @@
 ISR_SET_HANDLER(ISR_RESET,      main                               )
 ISR_SET_HANDLER(ISR_USART_RX,   serial_interrupt_handler_rx        )
 ISR_SET_HANDLER(ISR_USART_UDRE, serial_interrupt_handler_data_empty)
+ISR_SET_HANDLER(ISR_TIMER0_COMPA, m4164_interrupt_handler_dram_refresh)
 ISR_SET_ORG_FOR_USER_CODE()
 
 #include "utility_macros.csm"
 #include "utility_functions.csm"
 #include "serial.csm"
+#include "m4164.csm"
 #include "libc.csm"
 
 main:
@@ -26,10 +28,65 @@ main:
 	initialise_registers()
 
 	serial_init(115200)
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;;  4164 DRAM setup                                                         ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	; Configure timer0 to refresh the DRAM every 15.625us
+	;
+	; clear Force Compare, WGM02, select 1/256 prescaler
+	ldi    r25, (0<<FOC0A)|(0<<FOC0B)|(0<<WGM02)|(1<<CS02)|(0<<CS01)|(0<<CS00)
+	out    TCCR0B, r25
+	; clear Compare Match Output, enable CTC mode
+	ldi    r25, (0<<COM0A1)|(0<<COM0A0)|(0<<COM0B1)|(0<<COM0B0)|(1<<WGM01)|(0<<WGM00)
+	out    TCCR0A, r25
+	; Set compare value
+	ldi    r25, 125 ; F_CPU=16Mhz, prescaler=1/256 --> trigger every 2ms
+	out    OCR0A, r25
+	out    OCR0B, r00 ; dont care
+	; enable Compare Match A interrupt
+	ldi    r25, (1<<OCIE0A)
+	sts    TIMSK0, r25
+
+	; Initialise m4164 driver
+	; Physical connections:
+	;
+	;  N.C.  |  1  <---        --->  N.C. |  N/A
+	;  Din   |  2  <--- Grey   --->  D12  |  Port B4
+	; ~WE    |  3  <--- Black  --->  D10  |  Port B2
+	; ~RAS   |  4  <--- Brown  --->  D9   |  Port B1
+	;  A0    |  5  <--- Black  --->  D0   |  Port D0
+	;  A2    |  6  <--- Grey   --->  D2   |  Port D2
+	;  A1    |  7  <--- White  --->  D1   |  Port D1
+	;  Vcc   |  8  <---        --->  N.C. |  N/A
+	;  A7    |  9  <--- Orange --->  D7   |  Port D7
+	;  A5    | 10  <--- Yellow --->  D5   |  Port D5
+	;  A4    | 11  <--- Green  --->  D4   |  Port D4
+	;  A3    | 12  <--- Blue   --->  D3   |  Port D3
+	;  A6    | 13  <--- Purple --->  D6   |  Port D6
+	;  Dout  | 14  <--- Red    --->  D8   |  Port B0
+	; ~CAS   | 15  <--- White  --->  D11  |  Port B3
+	;  Vss   | 16  <---        --->  N.C. |  N/A
+	;
+	ldi    zl, low(m4164_config)
+	ldi    zh, high(m4164_config)
+	ldi    r25, 128         $   std    z+m4164_config_row_count,    r25
+	ldi    r25, 1<<PORTB2   $   std    z+m4164_config_WE_mask,      r25
+	ldi    r25, 1<<PORTB4   $   std    z+m4164_config_Din_mask,     r25
+	ldi    r25, 1<<PORTB0   $   std    z+m4164_config_Dout_mask,    r25
+	ldi    r25, 1<<PORTB3   $   std    z+m4164_config_CAS_mask,     r25
+	ldi    r25, 1<<PORTB1   $   std    z+m4164_config_RAS_mask,     r25
+
+	ldi    zl, low(m4164_config)
+	ldi    zh, high(m4164_config)
+	call   m4164_init
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 	sei
 
 .dseg
 	serial_rx_byte: .byte 1
+	m4164_config: .byte struct_m4164_config_size
 
 .cseg
 

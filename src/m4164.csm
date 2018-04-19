@@ -1,0 +1,330 @@
+/******************************************************************************
+
+   Driver for m4164 memory chips
+
+   Standard layout:
+
+          ____________
+         |    \__/    |
+   N.C.  |  1      16 |  Vss
+   Din   |  2      15 | ~CAS
+  ~WE    |  3      14 |  Dout
+  ~RAS   |  4      13 |  A6
+   A0    |  5      12 |  A3
+   A2    |  6      11 |  A4
+   A1    |  7      10 |  A5
+   Vcc   |  8       9 |  A7
+         |____________|
+
+
+   The library will use PORTB as the address lines, and PORTD for the control
+   lines.
+
+   It is  the user's responsibility to call the DRAM refresh handler at least
+   once every 2ms. Two functions are provided:
+    * m4164_dram_refresh
+    * m4164_interrupt_handler_dram_refresh
+   It is up to the user to decide which to use. Each function will refresh all
+   rows using RAS only refresh. Per row refresh (e.g. on a 15.625us timer) is
+   not used because of CPU overhead.
+
+   Due to limitations in the AVR instruction set, which doesn't support
+   indexed access to certain I/O registers (those requiring in/out intructions
+   to access), the library will assume that you have connected the address
+   lines (A0..A7) to Port B, and the control pins (Din, Dout, WE, RAS, CAS) to
+   Port D. While it would obviously be technically possible to work around
+   this limitation, I feel that in practice it would add too much overhead.
+   You can however still configure which bit in Port D controls which line.
+
+   Known issues/limitations:
+    * The whole of PORTD is used, even though we only need 5 control signals
+      This is because the driver explicitly constructs the state bits, rather
+      than modifying the current state.
+
+ ******************************************************************************/
+#pragma once
+#include "utility_macros.csm"
+#include "libc.csm"
+#include "string_constant.csm"
+
+; Tell the library about your connections:
+;
+; struct m4164_config {
+; 	char row_count;       // How many rows in this memory (typ. 128)
+; 	char WE_mask;
+; 	char Din_mask;        // I.e. 1<<Din_bit
+; 	char Dout_mask;
+; 	char CAS_mask;
+; 	char RAS_mask;
+.set m4164_config_row_count    = 0
+.set m4164_config_WE_mask      = m4164_config_row_count + 1
+.set m4164_config_Din_mask     = m4164_config_WE_mask   + 1
+.set m4164_config_Dout_mask    = m4164_config_Din_mask  + 1
+.set m4164_config_CAS_mask     = m4164_config_Dout_mask + 1
+.set m4164_config_RAS_mask     = m4164_config_CAS_mask  + 1
+; }
+.set struct_m4164_config_size  = m4164_config_WE_mask + 1
+;
+.dseg
+__m4164_config: .byte 2
+; last written row addr, used to preserve state across refresh cycles
+;__m4164_row_addr: .byte 1
+.cseg
+
+
+; z = m4164_config*
+; Configures driver and runs the initialisation sequence of the memory chip,
+; i.e. wait >200us and give 8 RAS cycles.
+DEF_LABELED(m4164_init,                                                       $\
+	save_registers(xl, xh, r23)                                                 $\
+	                                                                            $\
+	; XXX: set data directions arduino ports                                    $\
+	                                                                            $\
+	                                                                            $\
+	sts    __m4164_config+1, zl                                                 $\
+	sts    __m4164_config+0, zh                                                 $\
+	                                                                            $\
+	mov    r25, r00    ; by default keep unused pins low                        $\
+	mov    xl, r00     ; xl is mask of all used pins                            $\
+	                                                                            $\
+	ldd    r24, z+m4164_config_Din_mask                                         $\
+	or     r25, r24                                                             $\
+	or     xl, r24                                                              $\
+	                                                                            $\
+	ldd    r24, z+m4164_config_Dout_mask                                        $\
+	or     r25, r24                                                             $\
+	or     xl, r24                                                              $\
+	                                                                            $\
+	ldd    r24, z+m4164_config_WE_mask ; WE is active low                       $\
+	or     xl, r24                                                              $\
+	                                                                            $\
+	ldd    r24, z+m4164_config_CAS_mask ; CAS is active low                     $\
+	or     xl, r24                                                              $\
+	                                                                            $\
+	ldd    r24, z+m4164_config_RAS_mask ; RAS is active low                     $\
+	or     xl, r24                                                              $\
+	                                                                            $\
+	; disable interrupts, in case the user calls us after SEI, because          $\
+	; otherwise we wont be able to guarantee that RAS is held low for the       $\
+	; correct minimum amount of time.                                           $\
+	in     r23, SREG  ; store state of IE flag                                  $\
+	cli                                                                         $\
+	                                                                            $\
+	out    PORTB, r00                                                           $\
+	eor    r25, r02    ; default to disable                                     $\
+	and    r25, xl     ; limit to used pins                                     $\
+	out    PORTD, r25                                                           $\
+	                                                                            $\
+	; wait a bit for things to settle                                           $\
+	; I.e. the initial 200us (3200 cycles) pause                                $\
+	ldi    xl, low(3200)                                                        $\
+	ldi    xh, high(3200)                                                       $\
+__m4164_initial_pause:                                                        $\
+	sbiw   xl, 3      ; sub + brne = 3 cycles                                   $\
+	brne   __m4164_initial_pause                                                $\
+	                                                                            $\
+	; issue 8 RAS cycles                                                        $\
+	ldd    xl, z+m4164_config_RAS_mask                                          $\
+	eor    xl, r02     ; xl = ~RAS                                              $\
+	ldd    xh, z+m4164_config_RAS_mask                                          $\
+	ldi    r24, 8                                                               $\
+__m4164_init_RAS:                                                             $\
+	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
+	and    r25, xl     ; clear RAS bit in state                                 $\
+	out    PORTD, r25  ; assert RAS                                             $\
+	; Tras (RAS pulse width) width is 150ns (2.4 cycles)                        $\
+	or     r25, xh     ; set RAS bit in state                           /* 1 */ $\
+	dec    r24                                                          /* 2 */ $\
+	breq   __m4164_init_RAS_done                                        /* 3 */ $\
+	out    PORTD, r25  ; disable RAS                                            $\
+	; Trp (RAS precharge time) is 100ns (1.6 cycles)                            $\
+	rjmp   __m4164_init_RAS                                             /* 2 */ $\
+__m4164_init_RAS_done:                                                        $\
+	out    PORTD, r25  ; disable RAS (r25 is set in loop)                       $\
+	; technically we should now wait for Trp (100ns/1.6 cycles)                 $\
+	out    SREG, r23   ; restore IE flag (next instruction is still executed)   $\
+	nop                ; 2nd wait cycle                                         $\
+	                                                                            $\
+	                                                                            $\
+	restore_registers(xl, xh, r23)                                              $\
+	ret                                                                         $\
+)
+
+; z = address
+; bit in r16
+DEF_LABELED(m4164_dram_write_bit,                                             $\
+	cp     r00, r16                                                             $\
+	; fall-through intentional                                                  $\
+)
+
+; z = address
+; bit in carry
+DEF_LABELED(m4164_dram_write_bit_c,                                           $\
+	save_registers(r20, r21, r22, r23, yl, yh)                                  $\
+	                                                                            $\
+	lds    yl, __m4164_config+1                                                 $\
+	lds    yh, __m4164_config+0                                                 $\
+	ldd    r20, y+m4164_config_CAS_mask                                         $\
+	ldd    r21, y+m4164_config_RAS_mask                                         $\
+	ldd    r22, y+m4164_config_WE_mask                                          $\
+	                                                                            $\
+	; set up state                                                              $\
+	; the first thing we will do is assert ~RAS, so we dont include it in the   $\
+	; set up here. Simultaneously with RAS we will assert ~WE.                  $\
+	; bits that need to be set are:                                             $\
+	;  - Din                                                                    $\
+	;  - CAS                                                                    $\
+	; r24 will be the (initial) state                                           $\
+	mov    r24, r20    ; CAS                                                    $\
+	ldd    r25, y+m4164_config_Din_mask                                         $\
+	brcc   __m4164_dram_write_bit_0                                             $\
+	or     r24, r25                                                             $\
+__m4164_dram_write_bit_0:                                                     $\
+	mov    r25, r20                                                             $\
+	eor    r25, r02    ; r25 is CAS enable mask                                 $\
+	                                                                            $\
+	in     r23, SREG   ; store state of IE flag                                 $\
+	cli                ; prevent interrupt from messing with addresses          $\
+	out    PORTB, zh   ; set row address                                        $\
+	; strobe row address                                                        $\
+	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
+	; WE and RAS bits are already clear in state                                $\
+	out    PORTD, r24  ; enable RAS, WE                                         $\
+	; Tras (RAS pulse width) width is 150ns (2.4 cycles)              /* RAS */ $\
+	; Trah (row address hold time) is 15ns (0.24 cycles)                        $\
+	; strobe column address (interleave RAS)                                    $\
+	; Tcas (CAS pulse width) is 75ns (1.2 cycles)                               $\
+	; Tcpn (CAS precharge time non-page) is 25ns                                $\
+	; Trcd (RAS to CAS delay) is 25 < n < 75ns (non-normative)                  $\
+	and    r24, r25    ; clear CAS bit (covers Trah)                  /*   1 */ $\
+	out    PORTB, zl   ; Set column addr, Tasc is 0ns                 /*   3 */ $\
+	out    PORTD, r24  ; enable CAS                       /* CAS */   /*   3 */ $\
+	or     r24, r20    ; set RAS bit                      /*   1 */             $\
+	or     r24, r21    ; set CAS bit                      /*   2 */             $\
+	or     r24, r22    ; set WE bit (de-assert WE)                              $\
+	out    SREG, r23   ; restore IE flag (next instruction is still executed)   $\
+	out    PORTD, r24  ; disable RAS, CAS, WE                                   $\
+	                                                                            $\
+	; Trp (100ns) and Tcpn (25ns) are covered by function exit                  $\
+	restore_registers(r20, r21, r22, r23, yl, yh)                               $\
+	ret                                                                         $\
+)
+
+; z = address
+; bit returned in carry
+DEF_LABELED(m4164_dram_read_bit_c,                                            $\
+	; fall-through intentional                                                  $\
+)
+
+; z = address
+; bit returned in r25
+DEF_LABELED(m4164_dram_read_bit,                                              $\
+	save_registers(r20, r21, r23, yl, yh)                                       $\
+	                                                                            $\
+	lds    yl, __m4164_config+1                                                 $\
+	lds    yh, __m4164_config+0                                                 $\
+	ldd    r20, y+m4164_config_CAS_mask                                         $\
+	ldd    r21, y+m4164_config_RAS_mask                                         $\
+	                                                                            $\
+	; set up state                                                              $\
+	; the first thing we will do is assert ~RAS, so we dont include it in the   $\
+	; set up here. Simultaneously with RAS we will assert ~WE.                  $\
+	; bits that need to be set are:                                             $\
+	;  - CAS                                                                    $\
+	;  - WE                                                                     $\
+	; r24 will be the (initial) state                                           $\
+	mov    r24, r20    ; CAS                                                    $\
+	ldd    r25, y+m4164_config_WE_mask                                          $\
+	or     r24, r25                                                             $\
+	mov    r25, r20                                                             $\
+	eor    r25, r02    ; r25 is CAS enable mask                                 $\
+	                                                                            $\
+	in     r23, SREG   ; store state of IE flag                                 $\
+	cli                ; prevent interrupt from messing with addresses          $\
+	out    PORTB, zh   ; set row address                                        $\
+	; strobe row address                                                        $\
+	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
+	; WE and RAS bits are already clear in state                                $\
+	out    PORTD, r24  ; enable RAS, WE                                         $\
+	; Tras (RAS pulse width) width is 150ns (2.4 cycles)              /* RAS */ $\
+	; Trah (row address hold time) is 15ns (0.24 cycles)                        $\
+	; strobe column address (interleave RAS)                                    $\
+	; Tcas (CAS pulse width) is 75ns (1.2 cycles)                               $\
+	; Tcpn (CAS precharge time non-page) is 25ns                                $\
+	; Trcd (RAS to CAS delay) is 25 < n < 75ns (non-normative)                  $\
+	; Trac (access time from RAS) is <150ns (2.4 cycles)                        $\
+	; Tcac (access time from CAS) is <75ns  (1.2 cycles)                        $\
+	; NOTE: Im assuming that Tcac is a guarantee from the memory, i.e. data     $\
+	; will be available no later than 75ns after asserting CAS                  $\
+	and    r24, r25    ; clear CAS bit (covers Trah)                  /*   1 */ $\
+	out    PORTB, zl   ; Set row addr, Tasc is 0ns                    /*   2 */ $\
+	out    PORTD, r24  ; enable CAS                       /* CAS */   /*   3 */ $\
+	or     r24, r20    ; set RAS bit                      /*   1 */             $\
+	or     r24, r21    ; set CAS bit                      /*   2 */             $\
+	in     r25, PORTD  ; read bit                                               $\
+	out    SREG, r23   ; restore IE flag (next instruction is still executed)   $\
+	out    PORTD, r24  ; disable RAS, CAS                                       $\
+	                                                                            $\
+	; read bit will always set C, to cover for m4164_dram_read_bit_c; i.e.      $\
+	; one implementation for two functions, which we can do since we still      $\
+	; need to convert r25 from control bits to an actual bit value [0,1]        $\
+	ldd    r24, y+m4164_config_Dout_mask                                        $\
+	and    r25, r24                                                             $\
+	cp     r00, r25    ; sets C if r25 != 0                                     $\
+	brcc   __m4164_dram_read_bit_done                                           $\
+	mov    r25, r01                                                             $\
+	                                                                            $\
+__m4164_dram_read_bit_done:                                                   $\
+	; Trp (100ns) and Tcpn (25ns) are covered by function exit                  $\
+	restore_registers(r20, r21, r23, yl, yh)                                    $\
+	ret                                                                         $\
+)
+
+; Refreshes every row of the memory, should be called at least once every 2ms.
+ISR_HANDLER(m4164_interrupt_handler_dram_refresh,                             $\
+	call   m4164_dram_refresh                                                   $\
+)
+
+
+DEF_LABELED(m4164_dram_refresh,                                               $\
+	save_registers(r23, r24, r25, zl, zh)                                       $\
+	                                                                            $\
+	lds    zl, __m4164_config+1                                                 $\
+	lds    zh, __m4164_config+0                                                 $\
+	                                                                            $\
+	; This is a bit weird, but should work. We only need to refresh the given   $\
+	; number of rows. During refresh, the memory only cares about the lower n   $\
+	; bits of the address. So by starting at m4164_config_row_count and working $\
+	; our way down to 0, we first refresh row 0, followed by row n-1, down to   $\
+	; row 1; thus still covering all row addresses.                             $\
+	ldd    r24, z+m4164_config_row_count                                        $\
+	ldd    r25, z+m4164_config_RAS_mask                                         $\
+	mov    zh, r25     ; zh is the disable mask (RAS is active low)             $\
+	mov    zl, r25                                                              $\
+	eor    zl, r02     ; zl is the enable mask                                  $\
+	in     r23, PORTB  ; save current address                                   $\
+	in     r25, PORTD  ; load current state                                     $\
+	                                                                            $\
+__m4164_refresh_next_row:                                                     $\
+	out    PORTB, r24  ; select row address                                     $\
+	                                                                            $\
+	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
+	and    r25, zl     ; clear RAS bit in state                                 $\
+	out    PORTD, r25  ; enable RAS                                             $\
+	; Tras (RAS pulse width) width is 150ns (2.4 cycles)                        $\
+	dec    r24                                                          /* 1 */ $\
+	breq   __m4164_refresh_done                                         /* 2 */ $\
+	or     r25, zh     ; set RAS bit in state                           /* 3 */ $\
+	out    PORTD, r25  ; disable RAS                                            $\
+	; Trp (RAS precharge time) is 100ns (1.6 cycles)                            $\
+	rjmp   __m4164_refresh_next_row                                     /* 2 */ $\
+	                                                                            $\
+__m4164_refresh_done:                                                         $\
+	; Tasr is 0, Trah (row address hold time) is 15ns and Tasc (column address  $\
+	; setup time) is 0ns.                                                       $\
+	; Exit from this function will take sufficient time to cover all.           $\
+	out    PORTB, r23  ; restore address                                        $\
+	restore_registers(r23, r24, r25, zl, zh)                                    $\
+	                                                                            $\
+	ret                                                                         $\
+)
