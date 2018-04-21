@@ -84,25 +84,26 @@ DEF_LABELED(m4164_init,                                                       $\
 	sts    __m4164_config+1, zl                                                 $\
 	sts    __m4164_config+0, zh                                                 $\
 	                                                                            $\
-	mov    r25, r00    ; by default keep unused pins low                        $\
+	mov    r24, r00    ; all pins that we want to set                           $\
 	mov    xl, r00     ; xl is mask of all used pins                            $\
 	                                                                            $\
-	ldd    r24, z+m4164_config_Din_mask                                         $\
-	or     r25, r24                                                             $\
-	or     xl, r24                                                              $\
+	ldd    r25, z+m4164_config_Din_mask                                         $\
+	or     xl, r25                                                              $\
 	                                                                            $\
-	ldd    r24, z+m4164_config_Dout_mask                                        $\
-	or     r25, r24                                                             $\
-	or     xl, r24                                                              $\
+	ldd    r25, z+m4164_config_Dout_mask                                        $\
+	or     xl, r25                                                              $\
 	                                                                            $\
-	ldd    r24, z+m4164_config_WE_mask ; WE is active low                       $\
-	or     xl, r24                                                              $\
+	ldd    r25, z+m4164_config_WE_mask ; WE is active low                       $\
+	or     r24, r25                                                             $\
+	or     xl, r25                                                              $\
 	                                                                            $\
-	ldd    r24, z+m4164_config_CAS_mask ; CAS is active low                     $\
-	or     xl, r24                                                              $\
+	ldd    r25, z+m4164_config_CAS_mask ; CAS is active low                     $\
+	or     r24, r25                                                             $\
+	or     xl, r25                                                              $\
 	                                                                            $\
-	ldd    r24, z+m4164_config_RAS_mask ; RAS is active low                     $\
-	or     xl, r24                                                              $\
+	ldd    r25, z+m4164_config_RAS_mask ; RAS is active low                     $\
+	or     r24, r25                                                             $\
+	or     xl, r25                                                              $\
 	                                                                            $\
 	; disable interrupts, in case the user calls us after SEI, because          $\
 	; otherwise we wont be able to guarantee that RAS is held low for the       $\
@@ -110,10 +111,13 @@ DEF_LABELED(m4164_init,                                                       $\
 	in     r23, SREG  ; store state of IE flag                                  $\
 	cli                                                                         $\
 	                                                                            $\
+	; r24 = bits to set, xl = bits used                                         $\
 	out    PORTB, r00                                                           $\
-	eor    r25, r02    ; default to disable                                     $\
-	and    r25, xl     ; limit to used pins                                     $\
-	out    PORTD, r25                                                           $\
+	in     r25, PORTD  ; get current state /* XXX: quantum collapse simavr? */  $\
+	eor    xl, r02     ; xl = bits *not* used                                   $\
+	and    r25, xl     ; clear all used bits                                    $\
+	or     r25, r24    ; set bits that need to be set                           $\
+	out    PORTD, r25  ; update                                                 $\
 	                                                                            $\
 	; wait a bit for things to settle                                           $\
 	; I.e. the initial 200us (3200 cycles) pause                                $\
@@ -167,6 +171,7 @@ DEF_LABELED(m4164_dram_write_bit_c,                                           $\
 	ldd    r20, y+m4164_config_CAS_mask                                         $\
 	ldd    r21, y+m4164_config_RAS_mask                                         $\
 	ldd    r22, y+m4164_config_WE_mask                                          $\
+	ldd    r25, y+m4164_config_Din_mask                                         $\
 	                                                                            $\
 	; set up state                                                              $\
 	; the first thing we will do is assert ~RAS, so we dont include it in the   $\
@@ -175,17 +180,24 @@ DEF_LABELED(m4164_dram_write_bit_c,                                           $\
 	;  - Din                                                                    $\
 	;  - CAS                                                                    $\
 	; r24 will be the (initial) state                                           $\
-	mov    r24, r20    ; CAS                                                    $\
-	ldd    r25, y+m4164_config_Din_mask                                         $\
-	brcc   __m4164_dram_write_bit_0                                             $\
-	or     r24, r25                                                             $\
-__m4164_dram_write_bit_0:                                                     $\
-	mov    r25, r20                                                             $\
-	eor    r25, r02    ; r25 is CAS enable mask                                 $\
-	                                                                            $\
+	out    PORTB, zh   ; set row address                                        $\
 	in     r23, SREG   ; store state of IE flag                                 $\
 	cli                ; prevent interrupt from messing with addresses          $\
-	out    PORTB, zh   ; set row address                                        $\
+	in     r24, PORTD  ; get current state (will have CAS set)                  $\
+	or     r24, r25    ; set Din                                                $\
+	brcs   __m4164_dram_write_bit_1                                             $\
+	eor    r25, r02    ; invert Din mask                                        $\
+	and    r24, r25    ; clear Din                                              $\
+__m4164_dram_write_bit_1:                                                     $\
+	mov    r25, r21    ; set r25 to RAS bit                                     $\
+	eor    r25, r02    ; r25 is RAS mask                                        $\
+	and    r24, r25    ; enable RAS                                             $\
+	mov    r25, r22    ; set r25 to WE bit                                      $\
+	eor    r25, r02    ; r25 is WE mask                                         $\
+	and    r24, r25    ; enable WE                                              $\
+	mov    r25, r20    ; set r25 to CAS bit                                     $\
+	eor    r25, r02    ; r25 is CAS mask                                        $\
+	                                                                            $\
 	; strobe row address                                                        $\
 	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
 	; WE and RAS bits are already clear in state                                $\
@@ -233,15 +245,16 @@ DEF_LABELED(m4164_dram_read_bit,                                              $\
 	;  - CAS                                                                    $\
 	;  - WE                                                                     $\
 	; r24 will be the (initial) state                                           $\
-	mov    r24, r20    ; CAS                                                    $\
-	ldd    r25, y+m4164_config_WE_mask                                          $\
-	or     r24, r25                                                             $\
-	mov    r25, r20                                                             $\
-	eor    r25, r02    ; r25 is CAS enable mask                                 $\
-	                                                                            $\
+	out    PORTB, zh   ; set row address                                        $\
 	in     r23, SREG   ; store state of IE flag                                 $\
 	cli                ; prevent interrupt from messing with addresses          $\
-	out    PORTB, zh   ; set row address                                        $\
+	in     r24, PORTD  ; get current state (will have CAS set)                  $\
+	mov    r25, r21    ; set r25 to RAS bit                                     $\
+	eor    r25, r02    ; r25 is RAS mask                                        $\
+	and    r24, r25    ; enable RAS                                             $\
+	mov    r25, r20                                                             $\
+	eor    r25, r02    ; r25 is CAS mask                                        $\
+	                                                                            $\
 	; strobe row address                                                        $\
 	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
 	; WE and RAS bits are already clear in state                                $\
