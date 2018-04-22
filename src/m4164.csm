@@ -191,17 +191,17 @@ DEF_LABELED(m4164_dram_write_bit_c,                                           $\
 __m4164_dram_write_bit_1:                                                     $\
 	mov    r25, r21    ; set r25 to RAS bit                                     $\
 	eor    r25, r02    ; r25 is RAS mask                                        $\
-	and    r24, r25    ; enable RAS                                             $\
+	and    r24, r25    ; assert RAS                                             $\
 	mov    r25, r22    ; set r25 to WE bit                                      $\
 	eor    r25, r02    ; r25 is WE mask                                         $\
-	and    r24, r25    ; enable WE                                              $\
+	and    r24, r25    ; assert WE                                              $\
 	mov    r25, r20    ; set r25 to CAS bit                                     $\
 	eor    r25, r02    ; r25 is CAS mask                                        $\
 	                                                                            $\
 	; strobe row address                                                        $\
 	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
 	; WE and RAS bits are already clear in state                                $\
-	out    PORTD, r24  ; enable RAS, WE                                         $\
+	out    PORTD, r24  ; assert RAS, WE                                         $\
 	; Tras (RAS pulse width) width is 150ns (2.4 cycles)              /* RAS */ $\
 	; Trah (row address hold time) is 15ns (0.24 cycles)                        $\
 	; strobe column address (interleave RAS)                                    $\
@@ -210,7 +210,7 @@ __m4164_dram_write_bit_1:                                                     $\
 	; Trcd (RAS to CAS delay) is 25 < n < 75ns (non-normative)                  $\
 	and    r24, r25    ; clear CAS bit (covers Trah)                  /*   1 */ $\
 	out    PORTB, zl   ; Set column addr, Tasc is 0ns                 /*   3 */ $\
-	out    PORTD, r24  ; enable CAS                       /* CAS */   /*   3 */ $\
+	out    PORTD, r24  ; assert CAS                       /* CAS */   /*   3 */ $\
 	or     r24, r20    ; set RAS bit                      /*   1 */             $\
 	or     r24, r21    ; set CAS bit                      /*   2 */             $\
 	or     r24, r22    ; set WE bit (de-assert WE)                              $\
@@ -251,14 +251,14 @@ DEF_LABELED(m4164_dram_read_bit,                                              $\
 	in     r24, PORTD  ; get current state (will have CAS set)                  $\
 	mov    r25, r21    ; set r25 to RAS bit                                     $\
 	eor    r25, r02    ; r25 is RAS mask                                        $\
-	and    r24, r25    ; enable RAS                                             $\
+	and    r24, r25    ; assert RAS                                             $\
 	mov    r25, r20                                                             $\
 	eor    r25, r02    ; r25 is CAS mask                                        $\
 	                                                                            $\
 	; strobe row address                                                        $\
 	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
 	; WE and RAS bits are already clear in state                                $\
-	out    PORTD, r24  ; enable RAS, WE                                         $\
+	out    PORTD, r24  ; assert RAS, WE                                         $\
 	; Tras (RAS pulse width) width is 150ns (2.4 cycles)              /* RAS */ $\
 	; Trah (row address hold time) is 15ns (0.24 cycles)                        $\
 	; strobe column address (interleave RAS)                                    $\
@@ -271,7 +271,7 @@ DEF_LABELED(m4164_dram_read_bit,                                              $\
 	; will be available no later than 75ns after asserting CAS                  $\
 	and    r24, r25    ; clear CAS bit (covers Trah)                  /*   1 */ $\
 	out    PORTB, zl   ; Set row addr, Tasc is 0ns                    /*   2 */ $\
-	out    PORTD, r24  ; enable CAS                       /* CAS */   /*   3 */ $\
+	out    PORTD, r24  ; assert CAS                       /* CAS */   /*   3 */ $\
 	or     r24, r20    ; set RAS bit                      /*   1 */             $\
 	or     r24, r21    ; set CAS bit                      /*   2 */             $\
 	in     r25, PORTD  ; read bit                                               $\
@@ -323,7 +323,7 @@ __m4164_refresh_next_row:                                                     $\
 	                                                                            $\
 	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
 	and    r25, zl     ; clear RAS bit in state                                 $\
-	out    PORTD, r25  ; enable RAS                                             $\
+	out    PORTD, r25  ; assert RAS                                             $\
 	; Tras (RAS pulse width) width is 150ns (2.4 cycles)                        $\
 	dec    r24                                                          /* 1 */ $\
 	breq   __m4164_refresh_done                                         /* 2 */ $\
