@@ -293,6 +293,74 @@ __m4164_dram_read_bit_done:                                                   $\
 	ret                                                                         $\
 )
 
+; z=address, addresses next 8 bits
+; byte in r16
+;
+; assumes column address + 8 wont cross row boundary
+; retuns the next address (i.e. z+8) in z
+DEF_LABELED(m4164_dram_write_byte,                                            $\
+	save_registers(r21, r22, r23, yl, yh)                                       $\
+	                                                                            $\
+	lds    yl, __m4164_config+1                                                 $\
+	lds    yh, __m4164_config+0                                                 $\
+	ldd    r21, y+m4164_config_WE_mask                                          $\
+	ldd    r22, y+m4164_config_RAS_mask                                         $\
+	ldd    r23, y+m4164_config_CAS_mask                                         $\
+	ldd    r24, y+m4164_config_Din_mask                                         $\
+	                                                                            $\
+	; set up state                                                              $\
+	; the first thing we will do is assert ~RAS, so we dont include it in the   $\
+	; set up here. Simultaneously with RAS we will assert ~WE.                  $\
+	; bits that need to be set are:                                             $\
+	;  - Din                                                                    $\
+	;  - CAS                                                                    $\
+	; r25 will be the (initial) state                                           $\
+	out    PORTB, zh   ; set row address                                        $\
+	in     yh, SREG    ; store state of IE flag                                 $\
+	cli                ; prevent interrupt from messing with addresses          $\
+	in     r25, PORTD  ; get current state (will have CAS set)                  $\
+	eor    r25, r21    ; assert WE                                              $\
+	eor    r25, r22    ; assert RAS                                             $\
+	                                                                            $\
+	; strobe row address                                                        $\
+	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
+	out    PORTD, r25  ; assert RAS, WE                               /* RAS */ $\
+	; Tras (RAS pulse width) width is 150ns (2.4 cycles)                        $\
+	; Trah (row address hold time) is 15ns (0.24 cycles)                        $\
+	; strobe column address (interleave RAS)                                    $\
+	; Tcpn (CAS precharge time non-page) is 25ns                                $\
+	; Trcd (RAS to CAS delay) is 25 < n < 75ns (non-normative)                  $\
+	ldi    yl, 8       ; 8 bits to output                                       $\
+__m4164_dram_write_byte_next_bit:                                             $\
+	; set Din for next bit                                                      $\
+	or     r25, r24    ; set Din (or doesnt affect Carry)                       $\
+	rol    r16         ; after 8 rols we are back where we started              $\
+	brcs   __m4164_dram_write_byte_1                                            $\
+	eor    r25, r24    ; clear Din (and doesnt affect Carry)                    $\
+__m4164_dram_write_byte_1:                                                    $\
+	out    PORTB, zl   ; Set column addr, Tasc is 0ns                           $\
+	inc    zl          ; prepare for next bit                                   $\
+	; Tds is 0ns, so we should be able to assert both Din and CAS at once       $\
+	eor    r25, r23    ; clear CAS bit (eor doesnt affect Carry)                $\
+	out    PORTD, r25  ; output bit (assert CAS and Din)              /* CAS */ $\
+	; Tdh is just 30ns (0.48 cycles),                                           $\
+	; Tcas (CAS pulse width) is 75ns (1.2 cycles)                               $\
+	eor    r25, r23    ; set CAS bit (~CAS) (or doesnt affect Carry)  /*   1 */ $\
+	dec    yl          ; doesnt affect Carry                          /*   2 */ $\
+	out    PORTD, r25  ; de-assert CAS                                          $\
+	; Tcp is 60ns (0.96 cycles)                                                 $\
+	brne   __m4164_dram_write_byte_next_bit                                     $\
+	                                                                            $\
+	or     r25, r21    ; set WE bit                                             $\
+	or     r25, r22    ; set RAS bit                                            $\
+	out    SREG, yh    ; restore IE flag (next instruction is still executed)   $\
+	out    PORTD, r25  ; de-assert RAS, WE                                      $\
+	                                                                            $\
+	; Trp (100ns) and Tcpn (25ns) are covered by function exit                  $\
+	restore_registers(r21, r22, r23, yl, yh)                                    $\
+	ret                                                                         $\
+)
+
 ; Refreshes every row of the memory, should be called at least once every 2ms.
 ISR_HANDLER(m4164_interrupt_handler_dram_refresh,                             $\
 	call   m4164_dram_refresh                                                   $\
