@@ -129,15 +129,13 @@ __m4164_initial_pause:                                                        $\
 	                                                                            $\
 	; issue 8 RAS cycles                                                        $\
 	ldd    xl, z+m4164_config_RAS_mask                                          $\
-	eor    xl, r02     ; xl = ~RAS                                              $\
-	ldd    xh, z+m4164_config_RAS_mask                                          $\
 	ldi    r24, 8                                                               $\
 __m4164_init_RAS:                                                             $\
 	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
-	and    r25, xl     ; clear RAS bit in state                                 $\
+	eor    r25, xl     ; clear RAS bit in state                                 $\
 	out    PORTD, r25  ; assert RAS                                             $\
 	; Tras (RAS pulse width) width is 150ns (2.4 cycles)                        $\
-	or     r25, xh     ; set RAS bit in state                           /* 1 */ $\
+	eor    r25, xl     ; set RAS bit in state                           /* 1 */ $\
 	dec    r24                                                          /* 2 */ $\
 	breq   __m4164_init_RAS_done                                        /* 3 */ $\
 	out    PORTD, r25  ; disable RAS                                            $\
@@ -186,17 +184,10 @@ DEF_LABELED(m4164_dram_write_bit_c,                                           $\
 	in     r24, PORTD  ; get current state (will have CAS set)                  $\
 	or     r24, r25    ; set Din                                                $\
 	brcs   __m4164_dram_write_bit_1                                             $\
-	eor    r25, r02    ; invert Din mask                                        $\
-	and    r24, r25    ; clear Din                                              $\
+	eor    r24, r25    ; clear Din                                              $\
 __m4164_dram_write_bit_1:                                                     $\
-	mov    r25, r21    ; set r25 to RAS bit                                     $\
-	eor    r25, r02    ; r25 is RAS mask                                        $\
-	and    r24, r25    ; assert RAS                                             $\
-	mov    r25, r22    ; set r25 to WE bit                                      $\
-	eor    r25, r02    ; r25 is WE mask                                         $\
-	and    r24, r25    ; assert WE                                              $\
-	mov    r25, r20    ; set r25 to CAS bit                                     $\
-	eor    r25, r02    ; r25 is CAS mask                                        $\
+	eor    r24, r21    ; assert RAS                                             $\
+	eor    r24, r22    ; assert WE                                              $\
 	                                                                            $\
 	; strobe row address                                                        $\
 	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
@@ -208,7 +199,7 @@ __m4164_dram_write_bit_1:                                                     $\
 	; Tcas (CAS pulse width) is 75ns (1.2 cycles)                               $\
 	; Tcpn (CAS precharge time non-page) is 25ns                                $\
 	; Trcd (RAS to CAS delay) is 25 < n < 75ns (non-normative)                  $\
-	and    r24, r25    ; clear CAS bit (covers Trah)                  /*   1 */ $\
+	eor    r24, r20    ; clear CAS bit (covers Trah)                  /*   1 */ $\
 	out    PORTB, zl   ; Set column addr, Tasc is 0ns, Tcah is 20ns   /*   3 */ $\
 	out    PORTD, r24  ; assert CAS                       /* CAS */   /*   3 */ $\
 	or     r24, r20    ; set RAS bit                      /*   1 */             $\
@@ -249,11 +240,7 @@ DEF_LABELED(m4164_dram_read_bit,                                              $\
 	in     r23, SREG   ; store state of IE flag                                 $\
 	cli                ; prevent interrupt from messing with addresses          $\
 	in     r24, PORTD  ; get current state (will have CAS set)                  $\
-	mov    r25, r21    ; set r25 to RAS bit                                     $\
-	eor    r25, r02    ; r25 is RAS mask                                        $\
-	and    r24, r25    ; assert RAS                                             $\
-	mov    r25, r20                                                             $\
-	eor    r25, r02    ; r25 is CAS mask                                        $\
+	eor    r24, r21    ; assert RAS                                             $\
 	                                                                            $\
 	; strobe row address                                                        $\
 	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
@@ -269,10 +256,10 @@ DEF_LABELED(m4164_dram_read_bit,                                              $\
 	; Tcac (access time from CAS) is <75ns  (1.2 cycles)                        $\
 	; NOTE: Im assuming that Tcac is a guarantee from the memory, i.e. data     $\
 	; will be available no later than 75ns after asserting CAS                  $\
-	and    r24, r25    ; clear CAS bit (covers Trah)                  /*   1 */ $\
+	eor    r24, r20    ; clear CAS bit (covers Trah)                  /*   1 */ $\
 	out    PORTB, zl   ; Set row addr, Tasc is 0ns, Tcah is 20ns      /*   2 */ $\
 	out    PORTD, r24  ; assert CAS                       /* CAS */   /*   3 */ $\
-	or     r24, r20    ; set RAS bit                      /*   1 */             $\
+	eor    r24, r20    ; set RAS bit                      /*   1 */             $\
 	or     r24, r21    ; set CAS bit                      /*   2 */             $\
 	in     r25, PORTD  ; read bit                                               $\
 	out    SREG, r23   ; restore IE flag (next instruction is still executed)   $\
@@ -368,7 +355,7 @@ ISR_HANDLER(m4164_interrupt_handler_dram_refresh,                             $\
 
 
 DEF_LABELED(m4164_dram_refresh,                                               $\
-	save_registers(r23, r24, r25, zl, zh)                                       $\
+	save_registers(r24, r25, zl, zh)                                            $\
 	                                                                            $\
 	lds    zl, __m4164_config+1                                                 $\
 	lds    zh, __m4164_config+0                                                 $\
@@ -380,32 +367,30 @@ DEF_LABELED(m4164_dram_refresh,                                               $\
 	; row 1; thus still covering all row addresses.                             $\
 	ldd    r24, z+m4164_config_row_count                                        $\
 	ldd    r25, z+m4164_config_RAS_mask                                         $\
-	mov    zh, r25     ; zh is the disable mask (RAS is active low)             $\
-	mov    zl, r25                                                              $\
-	eor    zl, r02     ; zl is the enable mask                                  $\
-	in     r23, PORTB  ; save current address                                   $\
-	in     r25, PORTD  ; load current state                                     $\
+	in     zl, PORTB  ; save current address                                    $\
+	in     zh, PORTD  ; load current state                                      $\
 	                                                                            $\
 __m4164_refresh_next_row:                                                     $\
 	out    PORTB, r24  ; select row address                                     $\
 	                                                                            $\
 	; Tasr (row address setup time) = 0ns, so we can 'immediately' assert RAS   $\
-	and    r25, zl     ; clear RAS bit in state                                 $\
-	out    PORTD, r25  ; assert RAS                                             $\
+	eor    zh, r25     ; clear RAS bit in state                                 $\
 	; Tras (RAS pulse width) width is 150ns (2.4 cycles)                        $\
-	dec    r24                                                          /* 1 */ $\
-	breq   __m4164_refresh_done                                         /* 2 */ $\
-	or     r25, zh     ; set RAS bit in state                           /* 3 */ $\
-	out    PORTD, r25  ; disable RAS                                            $\
+	out    PORTD, zh   ; assert RAS                                   /* RAS */ $\
+	eor    zh, r25     ; set RAS bit in state                         /*   1 */ $\
+	dec    r24                                                        /*   2 */ $\
+	breq   __m4164_refresh_done                                       /*   3 */ $\
 	; Trp (RAS precharge time) is 100ns (1.6 cycles)                            $\
-	rjmp   __m4164_refresh_next_row                                     /* 2 */ $\
+	out    PORTD, zh   ; disable RAS                                 /* ~RAS */ $\
+	rjmp   __m4164_refresh_next_row                                  /*   2  */ $\
 	                                                                            $\
 __m4164_refresh_done:                                                         $\
 	; Tasr is 0, Trah (row address hold time) is 15ns, Tasc (column address     $\
 	; setup time) is 0ns, and , Tcah is 20ns.                                   $\
 	; Exit from this function will take sufficient time to cover all.           $\
-	out    PORTB, r23  ; restore address                                        $\
-	restore_registers(r23, r24, r25, zl, zh)                                    $\
+	out    PORTD, zh   ; disable RAS                                 /* ~RAS */ $\
+	out    PORTB, zl   ; restore address                                        $\
+	restore_registers(r24, r25, zl, zh)                                         $\
 	                                                                            $\
 	ret                                                                         $\
 )
