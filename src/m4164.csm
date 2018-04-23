@@ -209,7 +209,7 @@ __m4164_dram_write_bit_1:                                                     $\
 	; Tcpn (CAS precharge time non-page) is 25ns                                $\
 	; Trcd (RAS to CAS delay) is 25 < n < 75ns (non-normative)                  $\
 	and    r24, r25    ; clear CAS bit (covers Trah)                  /*   1 */ $\
-	out    PORTB, zl   ; Set column addr, Tasc is 0ns                 /*   3 */ $\
+	out    PORTB, zl   ; Set column addr, Tasc is 0ns, Tcah is 20ns   /*   3 */ $\
 	out    PORTD, r24  ; assert CAS                       /* CAS */   /*   3 */ $\
 	or     r24, r20    ; set RAS bit                      /*   1 */             $\
 	or     r24, r21    ; set CAS bit                      /*   2 */             $\
@@ -270,7 +270,7 @@ DEF_LABELED(m4164_dram_read_bit,                                              $\
 	; NOTE: Im assuming that Tcac is a guarantee from the memory, i.e. data     $\
 	; will be available no later than 75ns after asserting CAS                  $\
 	and    r24, r25    ; clear CAS bit (covers Trah)                  /*   1 */ $\
-	out    PORTB, zl   ; Set row addr, Tasc is 0ns                    /*   2 */ $\
+	out    PORTB, zl   ; Set row addr, Tasc is 0ns, Tcah is 20ns      /*   2 */ $\
 	out    PORTD, r24  ; assert CAS                       /* CAS */   /*   3 */ $\
 	or     r24, r20    ; set RAS bit                      /*   1 */             $\
 	or     r24, r21    ; set CAS bit                      /*   2 */             $\
@@ -338,7 +338,7 @@ __m4164_dram_write_byte_next_bit:                                             $\
 	brcs   __m4164_dram_write_byte_1                                            $\
 	eor    r25, r24    ; clear Din (and doesnt affect Carry)                    $\
 __m4164_dram_write_byte_1:                                                    $\
-	out    PORTB, zl   ; Set column addr, Tasc is 0ns                           $\
+	out    PORTB, zl   ; Set column addr, Tasc is 0ns, Tcah is 20ns             $\
 	inc    zl          ; prepare for next bit                                   $\
 	; Tds is 0ns, so we should be able to assert both Din and CAS at once       $\
 	eor    r25, r23    ; clear CAS bit (eor doesnt affect Carry)                $\
@@ -401,8 +401,8 @@ __m4164_refresh_next_row:                                                     $\
 	rjmp   __m4164_refresh_next_row                                     /* 2 */ $\
 	                                                                            $\
 __m4164_refresh_done:                                                         $\
-	; Tasr is 0, Trah (row address hold time) is 15ns and Tasc (column address  $\
-	; setup time) is 0ns.                                                       $\
+	; Tasr is 0, Trah (row address hold time) is 15ns, Tasc (column address     $\
+	; setup time) is 0ns, and , Tcah is 20ns.                                   $\
 	; Exit from this function will take sufficient time to cover all.           $\
 	out    PORTB, r23  ; restore address                                        $\
 	restore_registers(r23, r24, r25, zl, zh)                                    $\
