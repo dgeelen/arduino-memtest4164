@@ -231,7 +231,7 @@ DEF_LABELED(m4164_dram_read_bit,                                              $\
 	                                                                            $\
 	; set up state                                                              $\
 	; the first thing we will do is assert ~RAS, so we dont include it in the   $\
-	; set up here. Simultaneously with RAS we will assert ~WE.                  $\
+	; set up here.                                                              $\
 	; bits that need to be set are:                                             $\
 	;  - CAS                                                                    $\
 	;  - WE                                                                     $\
