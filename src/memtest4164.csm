@@ -108,6 +108,7 @@ loop:
 	rjmp  loop
 
 error_trap:
+	break
 	rjmp error_trap
 
 .org (RAMEND + 1)/2
