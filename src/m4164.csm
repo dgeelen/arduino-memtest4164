@@ -326,7 +326,7 @@ __m4164_dram_write_byte_next_bit:                                             $\
 	eor    r25, r24    ; clear Din (and doesnt affect Carry)                    $\
 __m4164_dram_write_byte_1:                                                    $\
 	out    PORTB, zl   ; Set column addr, Tasc is 0ns, Tcah is 20ns             $\
-	inc    zl          ; prepare for next bit                                   $\
+	adiw   zl, 1       ; prepare for next bit                                   $\
 	; Tds is 0ns, so we should be able to assert both Din and CAS at once       $\
 	eor    r25, r23    ; clear CAS bit (eor doesnt affect Carry)                $\
 	out    PORTD, r25  ; output bit (assert CAS and Din)              /* CAS */ $\
