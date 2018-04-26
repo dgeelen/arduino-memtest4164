@@ -36,11 +36,6 @@
    this limitation, I feel that in practice it would add too much overhead.
    You can however still configure which bit in Port B controls which line.
 
-   Known issues/limitations:
-    * The whole of PORTD is used, even though we only need 5 control signals
-      This is because the driver explicitly constructs the state bits, rather
-      than modifying the current state.
-
  ******************************************************************************/
 #pragma once
 #include "utility_macros.csm"
