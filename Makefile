@@ -137,6 +137,7 @@ simulation: $(TARGETS)
 #	PORTB=0x05, PORTD=0x0b, +32 = 0x25 & 0x2b
 	../simavr/simavr/run_avr --trace -v -v -v -v -v --mcu atmega328p --freq 16000000 -ff $(TARGETS:.bin=_simavr.hex) \
 		--vcd-trace-file $(BUILDDIR)/memtest4164.vcd                                \
+		--add-vcd-trace LED=trace@0x25/0x20                                         \
 		--add-vcd-trace ~WE=trace@0x25/0x04                                         \
 		--add-vcd-trace ~RAS=trace@0x25/0x02                                        \
 		--add-vcd-trace ~CAS=trace@0x25/0x08                                        \
