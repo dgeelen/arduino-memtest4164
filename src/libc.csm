@@ -278,18 +278,15 @@ __printf_length_modifier_l:                                                     
 DEF_LABELED(__printf_conversion_format_specifiers,                              $\
 	; see if it is any of the conversion format specifiers                        $\
 __printf_conversion_format_specifier_d:                                         $\
-	ldi    yl, low(__printf_d)                                                    $\
-	ldi    yh, high(__printf_d)                                                   $\
+	ldi    xl, low(__printf_d)                                                    $\
+	ldi    xh, high(__printf_d)                                                   $\
 	ldi    r24, 'd'                                                               $\
-	cp     r25, r24                                                               $\
-	breq   __printf_do_format                                                     $\
-	ldi    r24, 'D'                                                               $\
 	cp     r25, r24                                                               $\
 	breq   __printf_do_format                                                     $\
 	                                                                              $\
 __printf_conversion_format_specifier_x:                                         $\
-	ldi    yl, low(__printf_x)                                                    $\
-	ldi    yh, high(__printf_x)                                                   $\
+	ldi    xl, low(__printf_x)                                                    $\
+	ldi    xh, high(__printf_x)                                                   $\
 	ldi    r24, 'x'                                                               $\
 	cp     r25, r24                                                               $\
 	breq   __printf_do_format                                                     $\
@@ -343,8 +340,11 @@ DEF_LABELED(__printf_serial_write,                                              
 )
 
 DEF_LABELED(__printf_do_format,                                                 $\
-	; save pointer to format string, ready format routine pointer (swap y and z)  $\
-	; Note: at this point z points *at*  'x'                                      $\
+	; save pointer to format string, ready format routine pointer (swap x and z)  $\
+	; Note: at this point z points *at* 'x'                                       $\
+	;                     y points *at* '%'                                       $\
+	;                     x points *at* function                                  $\
+	movw  yl, xl                                                                  $\
 	movw  xl, zl                                                                  $\
 	                                                                              $\
 	; determine argument length (bytes)                                           $\
