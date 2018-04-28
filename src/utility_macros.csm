@@ -391,6 +391,11 @@ III_ISEMPTY(                                                               \
 #define CALL( F, ... ) F( __VA_ARGS__ )
 
 
+/**
+ * Swallows all arguments passed to it
+ */
+#define SWALLOW(...)
+
 
 /**
  * When passing e.g. __VA_ARGS__ through some BOOST_PP function (such as
@@ -527,6 +532,7 @@ III_ISEMPTY(                                                               \
 				description more than stack_manip___min_bytes (i.e. n) bytes of stack    \
 				requires 3 temporary registers (not ARG_COUNT(__VA_ARGS__)).             \
 			)                                                                         $\
+			SWALLOW                                                                    \
 		),                                                                           \
 		BOOST_PP_IIF(                                                                \
 			BOOST_PP_EQUAL(ARG_COUNT(__VA_ARGS__), 1),                                 \
@@ -534,6 +540,7 @@ III_ISEMPTY(                                                               \
 			.error BOOST_PP_STRINGIZE(                                                 \
 				description n byte(s) of stack requires a temporary register.            \
 			)                                                                         $\
+			SWALLOW                                                                    \
 		)                                                                            \
 	)                                                                              \
 	// stack_manip__
