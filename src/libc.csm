@@ -188,7 +188,7 @@ DEF_LABELED(_printf,                                                            
 	clr    r16           ; r16 will be the length of the unprinted string         $\
 	ldi    r22, 2        ; r22 will be flags; lower 3 bits indicate length        $\
 	clr    r23           ; r23 will be 'in conversion specifier' + type?          $\
-	movw   yl, zl        ; y will always point at the first unprinted byte        $\
+	movw   xl, zl        ; x will always point at the first unprinted byte        $\
 	                                                                              $\
 	rjmp   __printf_start                                                         $\
 	                                                                              $\
@@ -228,7 +228,7 @@ __printf_start:                                                                 
 	cpse   r16, r00                                                               $\
 	rcall  __printf_serial_write                                                  $\
 	ori    r23, __printf_conversion_specifier_mask                                $\
-	movw   yl, zl   ; remember start position (yl points at '%')                  $\
+	movw   xl, zl   ; remember start position (xl points at '%')                  $\
 	mov    r16, r00 ; updated in __printf_next_char                               $\
 	rjmp   __printf_next_char                                                     $\
 	                                                                              $\
@@ -278,15 +278,15 @@ __printf_length_modifier_l:                                                     
 DEF_LABELED(__printf_conversion_format_specifiers,                              $\
 	; see if it is any of the conversion format specifiers                        $\
 __printf_conversion_format_specifier_d:                                         $\
-	ldi    xl, low(__printf_d)                                                    $\
-	ldi    xh, high(__printf_d)                                                   $\
+	ldi    yl, low(__printf_d)                                                    $\
+	ldi    yh, high(__printf_d)                                                   $\
 	ldi    r24, 'd'                                                               $\
 	cp     r25, r24                                                               $\
 	breq   __printf_do_format                                                     $\
 	                                                                              $\
 __printf_conversion_format_specifier_x:                                         $\
-	ldi    xl, low(__printf_x)                                                    $\
-	ldi    xh, high(__printf_x)                                                   $\
+	ldi    yl, low(__printf_x)                                                    $\
+	ldi    yh, high(__printf_x)                                                   $\
 	ldi    r24, 'x'                                                               $\
 	cp     r25, r24                                                               $\
 	breq   __printf_do_format                                                     $\
@@ -321,20 +321,20 @@ __printf_done:                                                                  
 	ret                                                                           $\
 )
 
-; prints the currently accumulated buffer (in yl)
+; prints the currently accumulated buffer (in xl)
 ; len should be in r16 already
 ; saves z
-; clobbers x
+; clobbers y
 DEF_LABELED(__printf_serial_write,                                              $\
 	/*puts(abrackl)*/                                                             $\
-	movw   xl, zl   ; save current position                                       $\
-	movw   zl, yl   ; output buffer start, r16 is already set to len              $\
+	movw   yl, zl   ; save current position                                       $\
+	movw   zl, xl   ; output buffer start, r16 is already set to len              $\
 	call   serial_wait_tx_complete                                                $\
 	cpse   r08, r01                                                               $\
 	call   serial_write_rom                                                       $\
 	cpse   r08, r00                                                               $\
 	call   serial_write_ram                                                       $\
-	movw   zl, xl   ; restore current position                                    $\
+	movw   zl, yl   ; restore current position                                    $\
 	/*puts(abrackr)*/                                                             $\
 	ret                                                                           $\
 )
@@ -344,7 +344,6 @@ DEF_LABELED(__printf_do_format,                                                 
 	; Note: at this point z points *at* 'x'                                       $\
 	;                     y points *at* '%'                                       $\
 	;                     x points *at* function                                  $\
-	movw  yl, xl                                                                  $\
 	movw  xl, zl                                                                  $\
 	                                                                              $\
 	; determine argument length (bytes)                                           $\
@@ -375,8 +374,8 @@ DEF_LABELED(__printf_do_format,                                                 
 	; at this point xl = current pos, __printf_serial_ preserves z,               $\
 	; and z needs to be restored before exit                                      $\
 	movw   zl, xl         ; restore z                                             $\
-	ldi    yl, low(__printf_work_area)                                            $\
-	ldi    yh, high(__printf_work_area) ; __printf_serial_write needs ptr in y    $\
+	ldi    xl, low(__printf_work_area)                                            $\
+	ldi    xh, high(__printf_work_area) ; __printf_serial_write needs ptr in x    $\
 	mov    r22, r08       ; r22 is not needed anymore (for this format specifier) $\
 	mov    r08, r01       ; always write from ram (__printf_work_area)            $\
 	; r16 must always > 0 here                                                    $\
@@ -386,10 +385,10 @@ DEF_LABELED(__printf_do_format,                                                 
 	; switch back to normal printing                                              $\
 	andi   r23, BITINV(__printf_conversion_specifier_mask)                        $\
 	; zl already points at the current position                                   $\
-	; but yl points at the work area rather than the start of the current seq.    $\
-	movw   yl, zl                                                                 $\
+	; but xl points at the work area rather than the start of the current seq.    $\
+	movw   xl, zl                                                                 $\
 	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
-	adiw   yl, 1          ; which will overflow r16 to 0 and inc zl, but for yl   $\
+	adiw   xl, 1          ; which will overflow r16 to 0 and inc z, but for x     $\
 	ldi    r25, '%'      ;                                                        $\
 	ldi    r22, 2        ; r22 will be flags; lower 3 bits indicate length        $\
 	clr    r23           ; r23 will be 'in conversion specifier' + type?          $\
