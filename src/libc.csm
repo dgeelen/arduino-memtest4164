@@ -411,9 +411,6 @@ DEF_LABELED(__printf_do_format,                                                 
 	movw   xl, zl                                                                 $\
 	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
 	adiw   xl, 1          ; which will overflow r16 to 0 and inc z, but for x     $\
-	ldi    r25, '%'      ;                                                        $\
-	ldi    r22, 2        ; r22 will be flags; lower 3 bits indicate length        $\
-	clr    r23           ; r23 will be 'in conversion specifier' + type?          $\
 	rjmp   __printf_next_char ; we have to do it here.                            $\
 )
 
