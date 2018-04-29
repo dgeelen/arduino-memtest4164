@@ -12,6 +12,7 @@ ISR_SET_HANDLER(ISR_USART_UDRE, serial_interrupt_handler_data_empty)
 ISR_SET_HANDLER(ISR_TIMER0_COMPA, m4164_interrupt_handler_dram_refresh)
 ISR_SET_ORG_FOR_USER_CODE()
 
+#include <boost/preprocessor/seq/for_each.hpp>
 #include "utility_macros.csm"
 #include "utility_functions.csm"
 #include "serial.csm"
@@ -84,6 +85,184 @@ main:
 
 	sei
 
+	jmp run_all_tests
+
+	#define TESTS                                \
+		((10, "All Zeroes", ramtest_write_zeroes)) \
+	// TESTS
+
+	#define OP(i, data, elem) STRING_CONSTANT_N( \
+		BOOST_PP_CAT(                              \
+			BOOST_PP_TUPLE_ELEM(2, elem),            \
+			_desc                                    \
+		),                                         \
+		BOOST_PP_TUPLE_ELEM(0, elem),              \
+		BOOST_PP_TUPLE_ELEM(1, elem))              \
+	// OP
+	BOOST_PP_SEQ_FOR_EACH(OP, _, TESTS)
+	#undef OP
+
+test_names:
+	#define OP(i, data, elem)                    \
+		high(BOOST_PP_CAT(                         \
+			BOOST_PP_TUPLE_ELEM(2, elem),            \
+			_desc                                    \
+		)),                                        \
+		low(BOOST_PP_CAT(                          \
+			BOOST_PP_TUPLE_ELEM(2, elem),            \
+			_desc                                    \
+		)),                                        \
+	// OP
+	.db BOOST_PP_SEQ_FOR_EACH(OP, _, TESTS)
+	#undef OP
+
+test_funcs:
+	#define OP(i, data, elem)                                           \
+		.db                                                               \
+			high(             BOOST_PP_TUPLE_ELEM(2, elem)        ),        \
+			low (             BOOST_PP_TUPLE_ELEM(2, elem)        ),        \
+			high(BOOST_PP_CAT(BOOST_PP_TUPLE_ELEM(2, elem), _desc)),        \
+			low (BOOST_PP_CAT(BOOST_PP_TUPLE_ELEM(2, elem), _desc)),        \
+		$\
+	// OP
+	BOOST_PP_SEQ_FOR_EACH(OP, _, TESTS)
+	.db 0, 0 ; end of list
+	#undef OP
+
+#undef TESTS
+
+
+run_all_tests:
+	ldi    xl, low(FLASH_ADDR(test_funcs))
+	ldi    xh, high(FLASH_ADDR(test_funcs))
+
+run_next_test:
+	mov    zl, xl
+	mov    zh, xh
+
+	; load test addr
+	lpm    yh, z
+	adiw   zl, 1
+	lpm    yl, z
+	adiw   zl, 1
+
+	cp     r00, yl
+	cpc    r00, yh
+	brne   load_test_name
+	jmp    run_tests_complete_passed
+
+	; Determine and print test name
+load_test_name:
+	lpm    r25, z
+	adiw   zl, 1
+	lpm    r24, z
+	adiw   zl, 1
+	movw   xl, zl      ; save addr for next test
+	push   r24         ; in-memory pointers are high, low
+	push   r25
+	ldi    r25, low(running_test)
+	push   r25
+	ldi    r25, high(running_test)
+	push   r25
+	call   _printf
+	stack_free(4, r25)
+
+	movw   zl, yl      ; set address of test
+
+	icall              ; run test
+	cpse   r25, r00    ; 0 = test passed, 1 = test failed
+	rjmp   run_tests_complete_failed
+
+	ldi    r25, low(test_passed)
+	push   r25
+	ldi    r25, high(test_passed)
+	push   r25
+	call   _printf
+	stack_free(2, r25)
+
+	jmp run_next_test
+
+run_tests_complete_passed:
+	ldi    r25, low(test_result_passed)
+	push   r25
+	ldi    r25, high(test_result_passed)
+	push   r25
+	call   _printf
+	stack_free(2, r25)
+	ldi    r25, low(crlf)
+	push   r25
+	ldi    r25, high(crlf)
+	push   r25
+	call   _printf
+	stack_free(2, r25)
+	debug_break(50) // slow blink = ok
+
+run_tests_complete_failed:
+	; Print 'failed'
+	ldi    r25, low(test_failed)
+	push   r25
+	ldi    r25, high(test_failed)
+	push   r25
+	call   _printf
+	stack_free(2, r25)
+	; print 'bad chip'
+	ldi    r25, low(test_result_failed)
+	push   r25
+	ldi    r25, high(test_result_failed)
+	push   r25
+	call   _printf
+	stack_free(2, r25)
+	; additional newline
+	ldi    r25, low(crlf)
+	push   r25
+	ldi    r25, high(crlf)
+	push   r25
+	call   _printf
+	stack_free(2, r25)
+	debug_break(10) // fast blink = not ok
+
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Write zeroes                                                 ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_write_zeroes:
+	call   ramtest_write_zeroes_do_write
+	rjmp   ramtest_write_zeroes_verify
+
+ramtest_write_zeroes_do_write:
+	save_registers(r16, zl, zh)
+	ldi   zl, 0
+	ldi   zh, 0
+	ldi   r16, 0
+__ramtest_write_zeroes_do_write_next_byte:
+	call  m4164_dram_write_byte; auto increment z
+	cpi   zl, 0
+	brne  __ramtest_write_zeroes_do_write_next_byte
+	cpi   zh, 0
+	brne  __ramtest_write_zeroes_do_write_next_byte
+	restore_registers(r16, zl, zh)
+	ret
+
+ramtest_write_zeroes_verify:
+	save_registers(r16, zl, zh)
+	ldi   zl, 0
+	ldi   zh, 0
+	ldi   r16, 0
+__ramtest_write_zeroes_verify_next_byte:
+	call  m4164_dram_read_byte; auto increment z
+	or    r16, r25
+	cpi   zl, 0
+	brne  __ramtest_write_zeroes_verify_next_byte
+	cpi   zh, 0
+	brne  __ramtest_write_zeroes_verify_next_byte
+	mov   r25, r16
+	restore_registers(r16, zl, zh)
+	ret
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 .dseg
 	serial_rx_byte: .byte 1
 	m4164_config: .byte struct_m4164_config_size
@@ -107,9 +286,13 @@ loop:
 	stack_free(3, r25)
 	rjmp  loop
 
+
 error_trap:
 	break
+	debug_break(4)
 	rjmp error_trap
+
+
 
 .set string_constants_reserved_space = 512
 .set string_constants_org = (FLASHEND - string_constants_reserved_space + 1)/2
@@ -119,8 +302,14 @@ error_trap:
 .org string_constants_org
 
 STRING_CONSTANT_N(read_byte, 19, "read byte: '%hhx'", STRING_CONSTANT_CRLF);
+STRING_CONSTANT_N(running_test, 20, "Running test '%s'...");
+STRING_CONSTANT_N(test_passed, 9, " passed", STRING_CONSTANT_CRLF);
+STRING_CONSTANT_N(test_failed, 9, " FAILED", STRING_CONSTANT_CRLF);
+STRING_CONSTANT_N(test_result_passed, 54, "All tests completed, this memory chip seems fine :-)", STRING_CONSTANT_CRLF);
+STRING_CONSTANT_N(test_result_failed, 58, "The last test failed, this memory chip may be broken :-(", STRING_CONSTANT_CRLF);
+STRING_CONSTANT_N(crlf, 2, STRING_CONSTANT_CRLF);
 
 string_constants_eof:
-.if (string_constants_eof*2)-1 > FLASHEND
+.if FLASH_ADDR(string_constants_eof) - 1 > FLASHEND
 	.error "Not enough reserved space to store all string constants (ran out of flash!)"
 .endif
