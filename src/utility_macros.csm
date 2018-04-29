@@ -590,7 +590,7 @@ III_ISEMPTY(                                                               \
  */
 #define DEF_LABELED_0( name, ... )   DEF_MARKER( name, $ name: __VA_ARGS__ )
 #define DEF_LABELED_1( name      )   DEF_MARKER( name, $ name: ; note: label only$ )
-#define DEF_LABELED( ... )          CAT_N( DEF_LABELED_, IS_EMPTY( VARIADIC_TAIL( __VA_ARGS__ ) ) )( __VA_ARGS__ )
+#define DEF_LABELED( ... )           CAT_N( DEF_LABELED_, IS_EMPTY( VARIADIC_TAIL( __VA_ARGS__ ) ) )( __VA_ARGS__ )
 
 
 
