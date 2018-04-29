@@ -89,6 +89,7 @@ main:
 
 	#define TESTS                                \
 		((10, "All Zeroes", ramtest_write_zeroes)) \
+		(( 8, "All Ones"  , ramtest_write_ones  )) \
 	// TESTS
 
 	#define OP(i, data, elem) STRING_CONSTANT_N( \
@@ -257,6 +258,48 @@ __ramtest_write_zeroes_verify_next_byte:
 	cpi   zh, 0
 	brne  __ramtest_write_zeroes_verify_next_byte
 	mov   r25, r16
+	restore_registers(r16, zl, zh)
+	ret
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Write ones                                                   ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_write_ones:
+	call   ramtest_write_ones_do_write
+	rjmp   ramtest_write_ones_verify
+
+ramtest_write_ones_do_write:
+	save_registers(r16, zl, zh)
+	ldi   zl, 0
+	ldi   zh, 0
+	ldi   r16, 0xff
+__ramtest_write_ones_do_write_next_byte:
+	call  m4164_dram_write_byte; auto increment z
+	cpi   zl, 0
+	brne  __ramtest_write_ones_do_write_next_byte
+	cpi   zh, 0
+	brne  __ramtest_write_ones_do_write_next_byte
+	restore_registers(r16, zl, zh)
+	ret
+
+ramtest_write_ones_verify:
+	save_registers(r16, zl, zh)
+	ldi   zl, 0
+	ldi   zh, 0
+	ldi   r16, 0xff
+__ramtest_write_ones_verify_next_byte:
+	call  m4164_dram_read_byte; auto increment z
+	and   r16, r25
+	cpi   zl, 0
+	brne  __ramtest_write_ones_verify_next_byte
+	cpi   zh, 0
+	brne  __ramtest_write_ones_verify_next_byte
+	mov   r25, r16
+	eor   r25, r02 ; invert bits, should be all ones --> zeroes
 	restore_registers(r16, zl, zh)
 	ret
 
