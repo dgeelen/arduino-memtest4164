@@ -228,82 +228,69 @@ run_tests_complete_failed:
 	;; Ram test -- Write zeroes                                                 ;;
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ramtest_write_zeroes:
-	call   ramtest_write_zeroes_do_write
-	rjmp   ramtest_write_zeroes_verify
-
-ramtest_write_zeroes_do_write:
-	save_registers(r16, zl, zh)
-	ldi   zl, 0
-	ldi   zh, 0
-	ldi   r16, 0
-__ramtest_write_zeroes_do_write_next_byte:
-	call  m4164_dram_write_byte; auto increment z
-	cpi   zl, 0
-	brne  __ramtest_write_zeroes_do_write_next_byte
-	cpi   zh, 0
-	brne  __ramtest_write_zeroes_do_write_next_byte
-	restore_registers(r16, zl, zh)
+	save_registers(r16)
+	ldi    r16, 0
+	call   ramtest_fill_memory
+	call   ramtest_compare_memory
+	restore_registers(r16)
 	ret
-
-ramtest_write_zeroes_verify:
-	save_registers(r16, zl, zh)
-	ldi   zl, 0
-	ldi   zh, 0
-	ldi   r16, 0
-__ramtest_write_zeroes_verify_next_byte:
-	call  m4164_dram_read_byte; auto increment z
-	or    r16, r25
-	cpi   zl, 0
-	brne  __ramtest_write_zeroes_verify_next_byte
-	cpi   zh, 0
-	brne  __ramtest_write_zeroes_verify_next_byte
-	mov   r25, r16
-	restore_registers(r16, zl, zh)
-	ret
-
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;; Ram test -- Write ones                                                   ;;
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ramtest_write_ones:
-	call   ramtest_write_ones_do_write
-	rjmp   ramtest_write_ones_verify
-
-ramtest_write_ones_do_write:
-	save_registers(r16, zl, zh)
-	ldi   zl, 0
-	ldi   zh, 0
-	ldi   r16, 0xff
-__ramtest_write_ones_do_write_next_byte:
-	call  m4164_dram_write_byte; auto increment z
-	cpi   zl, 0
-	brne  __ramtest_write_ones_do_write_next_byte
-	cpi   zh, 0
-	brne  __ramtest_write_ones_do_write_next_byte
-	restore_registers(r16, zl, zh)
+	save_registers(r16)
+	ldi    r16, 0xff
+	call   ramtest_fill_memory
+	call   ramtest_compare_memory
+	restore_registers(r16)
 	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-ramtest_write_ones_verify:
-	save_registers(r16, zl, zh)
-	ldi   zl, 0
-	ldi   zh, 0
-	ldi   r16, 0xff
-__ramtest_write_ones_verify_next_byte:
-	call  m4164_dram_read_byte; auto increment z
-	and   r16, r25
-	cpi   zl, 0
-	brne  __ramtest_write_ones_verify_next_byte
-	cpi   zh, 0
-	brne  __ramtest_write_ones_verify_next_byte
-	mov   r25, r16
-	eor   r25, r02 ; invert bits, should be all ones --> zeroes
-	restore_registers(r16, zl, zh)
-	ret
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- fill memory                                                  ;;
+	;; r16 -- value                                                             ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_fill_memory:
+	save_registers(zl, zh)
+	ldi   zl, 0
+	ldi   zh, 0
+__ramtest_fill_memory_next_byte:
+	call  m4164_dram_write_byte; auto increment z
+	cpi   zl, 0
+	brne  __ramtest_fill_memory_next_byte
+	cpi   zh, 0
+	brne  __ramtest_fill_memory_next_byte
+	restore_registers(zl, zh)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- compare memory                                               ;;
+	;; r16 -- expected value                                                    ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_compare_memory:
+	save_registers(r23, zl, zh)
+	ldi   zl, 0
+	ldi   zh, 0
+	mov   r23, r00
+__ramtest_compare_memory_next_byte:
+	call  m4164_dram_read_byte; auto increment z
+	cpse  r16, r25
+	mov   r23, r01
+	cpi   zl, 0
+	brne  __ramtest_compare_memory_next_byte
+	cpi   zh, 0
+	brne  __ramtest_compare_memory_next_byte
+	mov   r25, r23
+	restore_registers(r23, zl, zh)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 
 .dseg
