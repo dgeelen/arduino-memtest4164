@@ -97,7 +97,7 @@ __is_rom_addr:                                                                  
 
 ////////////////////////////////////////////////////////////////////////////////
 ;   z: buffer
-; r16: buffer length           ; XXX: strlen()
+; r16: buffer length           ; XXX: switch rom/ram
 DEF_LABELED(_puts,                                                              $\
 	call  serial_wait_tx_complete                                                 $\
 	call  serial_write_rom                                                        $\
@@ -112,6 +112,28 @@ DEF_LABELED(_puts,                                                              
 	restore_registers(zl, zh, r16)                                                $\
 // puts()
 
+////////////////////////////////////////////////////////////////////////////////
+; z: pointer
+; returns length of string in r25
+DEF_LABELED(_strlen,                                                            $\
+	save_registers(r23)                                                           $\
+	rcall  _is_ram_addr                                                           $\
+	mov    r23, r25                                                               $\
+	clr    r25                                                                    $\
+__strlen_next_char:                                                             $\
+	ld     r24, z                                                                 $\
+	cpse   r23, r01                                                               $\
+	lpm    r24, z                                                                 $\
+	adiw   zl, 1                                                                  $\
+	add    r25, r01                                                               $\
+	cpse   r24, r00                                                               $\
+	rjmp   __strlen_next_char                                                     $\
+	sub    zl, r25                                                                $\
+	sbc    zh, r00                                                                $\
+	sub    r25, r01                                                               $\
+	restore_registers(r23)                                                        $\
+	ret                                                                           $\
+)
 
 
 ////////////////////////////////////////////////////////////////////////////////
