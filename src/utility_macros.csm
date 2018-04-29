@@ -737,3 +737,9 @@ III_ISEMPTY(                                                               \
 	,                                                                              \
 	BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)                                          \
 ) // push()
+
+/**
+ * When working with the flash, all addresses need to be multiplied by two,
+ * because the flash is only word addressable.
+ */
+#define FLASH_ADDR(x) (2*(x))
