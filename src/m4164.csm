@@ -281,7 +281,7 @@ __m4164_dram_read_bit_done:                                                   $\
 ; assumes column address + 8 wont cross row boundary
 ; retuns the next address (i.e. z+8) in z
 DEF_LABELED(m4164_dram_write_byte,                                            $\
-	save_registers(r21, r22, r23, yl, yh)                                       $\
+	save_registers(r16, r21, r22, r23, yl, yh)                                  $\
 	                                                                            $\
 	lds    yl, __m4164_config+1                                                 $\
 	lds    yh, __m4164_config+0                                                 $\
@@ -316,7 +316,7 @@ DEF_LABELED(m4164_dram_write_byte,                                            $\
 __m4164_dram_write_byte_next_bit:                                             $\
 	; set Din for next bit                                                      $\
 	or     r25, r24    ; set Din (or doesnt affect Carry)                       $\
-	rol    r16         ; after 8 rols we are back where we started              $\
+	rol    r16         ; get next bit                                           $\
 	brcs   __m4164_dram_write_byte_1                                            $\
 	eor    r25, r24    ; clear Din (and doesnt affect Carry)                    $\
 __m4164_dram_write_byte_1:                                                    $\
@@ -339,7 +339,7 @@ __m4164_dram_write_byte_1:                                                    $\
 	out    PORTB, r25  ; de-assert RAS, WE                                      $\
 	                                                                            $\
 	; Trp (100ns) and Tcpn (25ns) are covered by function exit                  $\
-	restore_registers(r21, r22, r23, yl, yh)                                    $\
+	restore_registers(r16, r21, r22, r23, yl, yh)                               $\
 	ret                                                                         $\
 )
 
