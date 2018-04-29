@@ -110,7 +110,7 @@ __serial_rx_var_begin:
 
 ; Tx
 __serial_tx_lpm:     .byte 1 ; source of data (ram or rom)
-__serial_tx_len:     .byte 1 ; Size of tx buffer. If > 127, uses lpm
+__serial_tx_len:     .byte 1 ; Size of tx buffer
 __serial_tx_pos:     .byte 1 ; Pos in tx buffer
 __serial_tx_buf_ptr: .byte 2 ; pointer to tx buffer
 
