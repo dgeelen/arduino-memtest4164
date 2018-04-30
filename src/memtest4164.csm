@@ -87,11 +87,13 @@ main:
 
 	jmp run_all_tests
 
-	#define TESTS                              \
-		((10, "All Zeroes", ramtest_all_zeroes)) \
-		(( 8, "All Ones"  , ramtest_all_ones  )) \
-		(( 9, "Even bits" , ramtest_even_bits )) \
-		(( 8, "Odd bits"  , ramtest_odd_bits  )) \
+	#define TESTS                                       \
+		((10, "All Zeroes"    , ramtest_all_zeroes     )) \
+		(( 8, "All Ones"      , ramtest_all_ones       )) \
+		(( 9, "Even bits"     , ramtest_even_bits      )) \
+		(( 8, "Odd bits"      , ramtest_odd_bits       )) \
+		((12, "Walking Ones"  , ramtest_walking_ones   )) \
+		((14, "Walking Zeroes", ramtest_walking_zeroes )) \
 	// TESTS
 
 	#define OP(i, data, elem) STRING_CONSTANT_N( \
@@ -198,6 +200,7 @@ run_test_print:
 	call   _printf
 	stack_free(2, r25)
 
+	call   ram_test_delay_long
 	jmp run_next_test
 
 run_tests_complete:
@@ -298,6 +301,86 @@ ramtest_odd_bits:
 
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Walking Ones                                                 ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_walking_ones:
+	ldi    r24, 0b00000001
+	ldi    r25, 0b10000000
+	rjmp   __ramtest_walking_bits_impl
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Walking Zeroes                                               ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_walking_zeroes:
+	ldi    r24, 0b11111110
+	ldi    r25, 0b01111111
+	rjmp   __ramtest_walking_bits_impl
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Walking bits (helper)                                        ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+__ramtest_walking_bits_impl:
+	save_registers(r16, r17, r18, r19, zl, zh)
+	movw   r18, r24
+	clr   r17
+	clr   zl
+	clr   zh
+
+__ramtest_walking_bits_impl_next_start:
+	mov    r16, r18    ; initial position
+__ramtest_walking_bits_impl_write_byte:
+	call  m4164_dram_write_byte; auto increment z
+
+	; Walk the bit
+	mov    r25, r16
+	rol    r25         ; move top bit into carry
+	rol    r16         ; rotate
+
+	cpi    zl, 0
+	brne   __ramtest_walking_bits_impl_write_byte
+	cpi    zh, 0
+	brne   __ramtest_walking_bits_impl_write_byte
+
+	mov    r16, r18
+__ramtest_walking_bits_impl_read_byte:
+	call   m4164_dram_read_byte; auto increment z
+
+	cpse   r16, r25
+	mov    r17, r16    ; r16 (pattern) is always nonzero
+
+	; Walk the bit
+	mov    r25, r16
+	rol    r25         ; move top bit into carry
+	rol    r16         ; rotate
+
+	cpi    zl, 0
+	brne   __ramtest_walking_bits_impl_read_byte
+	cpi    zh, 0
+	brne   __ramtest_walking_bits_impl_read_byte
+
+	cp     r18, r19
+	breq   __ramtest_walking_bits_impl_done
+
+	call   ram_test_delay_short
+	; Walk the bit
+	mov    r25, r18
+	rol    r25         ; move top bit into carry
+	rol    r18         ; rotate
+
+	rjmp   __ramtest_walking_bits_impl_next_start
+
+__ramtest_walking_bits_impl_done:
+	mov    r25, r17
+	restore_registers(r16, r17, r18, r19, zl, zh)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;; Ram test -- fill memory                                                  ;;
 	;; r16 -- value                                                             ;;
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -362,6 +445,18 @@ __ram_test_delay_n:
 ram_test_delay_short:
 	push   r16
 	ldi    r16, 1
+	call   ram_test_delay_n
+	pop    r16
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- delay long                                                   ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ram_test_delay_long:
+	push   r16
+	ldi    r16, 10
 	call   ram_test_delay_n
 	pop    r16
 	ret
