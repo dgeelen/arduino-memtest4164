@@ -246,6 +246,7 @@ ramtest_all_zeroes:
 	save_registers(r16)
 	ldi    r16, 0
 	call   ramtest_fill_memory
+	call   ram_test_delay_short
 	call   ramtest_compare_memory
 	restore_registers(r16)
 	ret
@@ -259,6 +260,7 @@ ramtest_all_ones:
 	save_registers(r16)
 	ldi    r16, 0xff
 	call   ramtest_fill_memory
+	call   ram_test_delay_short
 	call   ramtest_compare_memory
 	restore_registers(r16)
 	ret
@@ -272,6 +274,7 @@ ramtest_even_bits:
 	save_registers(r16)
 	ldi    r16, 0b10101010
 	call   ramtest_fill_memory
+	call   ram_test_delay_short
 	call   ramtest_compare_memory
 	restore_registers(r16)
 	ret
@@ -285,6 +288,7 @@ ramtest_odd_bits:
 	save_registers(r16)
 	ldi    r16, 0b01010101
 	call   ramtest_fill_memory
+	call   ram_test_delay_short
 	call   ramtest_compare_memory
 	restore_registers(r16)
 	ret
@@ -333,6 +337,33 @@ __ramtest_compare_memory_next_byte:
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- delay                                                        ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ram_test_delay_n:
+	eor   zh, zh                 ;      1       1
+	eor   zl, zl                 ;      1       2
+	mov   r25, r16               ;      1       3
+__ram_test_delay_n:
+	sub   zl, r01                ;      1       4
+	sbc   zh, r00                ;      1       5
+	brne  __ram_test_delay_n     ;    1/2       5 + 65534*2 + 1 = 131074
+	dec   r25                    ;
+	brne  __ram_test_delay_n
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- delay short                                                  ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ram_test_delay_short:
+	push  r16
+	ldi   r16, 1
+	call ram_test_delay_n
+	pop   r16
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .dseg
 	serial_rx_byte: .byte 1
