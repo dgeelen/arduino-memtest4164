@@ -106,17 +106,19 @@ main:
 	#undef OP
 
 test_names:
-	#define OP(i, data, elem)                    \
-		high(BOOST_PP_CAT(                         \
-			BOOST_PP_TUPLE_ELEM(2, elem),            \
-			_desc                                    \
-		)),                                        \
-		low(BOOST_PP_CAT(                          \
-			BOOST_PP_TUPLE_ELEM(2, elem),            \
-			_desc                                    \
-		)),                                        \
+	#define OP(i, data, elem)                      \
+		.db                                          \
+			high(BOOST_PP_CAT(                         \
+				BOOST_PP_TUPLE_ELEM(2, elem),            \
+				_desc                                    \
+			)),                                        \
+			low(BOOST_PP_CAT(                          \
+				BOOST_PP_TUPLE_ELEM(2, elem),            \
+				_desc                                    \
+			)),                                        \
+		$                                            \
 	// OP
-	.db BOOST_PP_SEQ_FOR_EACH(OP, _, TESTS)
+	BOOST_PP_SEQ_FOR_EACH(OP, _, TESTS)
 	#undef OP
 
 test_funcs:
@@ -126,7 +128,7 @@ test_funcs:
 			low (             BOOST_PP_TUPLE_ELEM(2, elem)        ),        \
 			high(BOOST_PP_CAT(BOOST_PP_TUPLE_ELEM(2, elem), _desc)),        \
 			low (BOOST_PP_CAT(BOOST_PP_TUPLE_ELEM(2, elem), _desc)),        \
-		$\
+		$                                                                 \
 	// OP
 	BOOST_PP_SEQ_FOR_EACH(OP, _, TESTS)
 	.db 0, 0 ; end of list
