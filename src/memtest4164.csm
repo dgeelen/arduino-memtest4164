@@ -87,9 +87,11 @@ main:
 
 	jmp run_all_tests
 
-	#define TESTS                                \
+	#define TESTS                              \
 		((10, "All Zeroes", ramtest_all_zeroes)) \
 		(( 8, "All Ones"  , ramtest_all_ones  )) \
+		(( 9, "Even bits" , ramtest_even_bits )) \
+		(( 8, "Odd bits"  , ramtest_odd_bits  )) \
 	// TESTS
 
 	#define OP(i, data, elem) STRING_CONSTANT_N( \
@@ -256,6 +258,32 @@ ramtest_all_zeroes:
 ramtest_all_ones:
 	save_registers(r16)
 	ldi    r16, 0xff
+	call   ramtest_fill_memory
+	call   ramtest_compare_memory
+	restore_registers(r16)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Even bits                                                    ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_even_bits:
+	save_registers(r16)
+	ldi    r16, 0b10101010
+	call   ramtest_fill_memory
+	call   ramtest_compare_memory
+	restore_registers(r16)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Odd bits                                                     ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_odd_bits:
+	save_registers(r16)
+	ldi    r16, 0b01010101
 	call   ramtest_fill_memory
 	call   ramtest_compare_memory
 	restore_registers(r16)
