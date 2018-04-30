@@ -88,8 +88,8 @@ main:
 	jmp run_all_tests
 
 	#define TESTS                                \
-		((10, "All Zeroes", ramtest_write_zeroes)) \
-		(( 8, "All Ones"  , ramtest_write_ones  )) \
+		((10, "All Zeroes", ramtest_all_zeroes)) \
+		(( 8, "All Ones"  , ramtest_all_ones  )) \
 	// TESTS
 
 	#define OP(i, data, elem) STRING_CONSTANT_N( \
@@ -225,9 +225,9 @@ run_tests_complete_failed:
 
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	;; Ram test -- Write zeroes                                                 ;;
+	;; Ram test -- All zeroes                                                   ;;
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-ramtest_write_zeroes:
+ramtest_all_zeroes:
 	save_registers(r16)
 	ldi    r16, 0
 	call   ramtest_fill_memory
@@ -238,9 +238,9 @@ ramtest_write_zeroes:
 
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	;; Ram test -- Write ones                                                   ;;
+	;; Ram test -- All ones                                                     ;;
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-ramtest_write_ones:
+ramtest_all_ones:
 	save_registers(r16)
 	ldi    r16, 0xff
 	call   ramtest_fill_memory
