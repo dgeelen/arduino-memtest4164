@@ -134,6 +134,8 @@ test_funcs:
 
 
 run_all_tests:
+	ldi    r16, 00 ; total number of tests run
+	ldi    r17, 00 ; number of failed tests
 	ldi    xl, low(FLASH_ADDR(test_funcs))
 	ldi    xh, high(FLASH_ADDR(test_funcs))
 
@@ -149,8 +151,8 @@ run_next_test:
 
 	cp     r00, yl
 	cpc    r00, yh
-	brne   load_test_name
-	jmp    run_tests_complete_passed
+	breq   run_tests_complete
+	inc    r16
 
 	; Determine and print test name
 load_test_name:
@@ -172,18 +174,34 @@ load_test_name:
 
 	icall              ; run test
 	cpse   r25, r00    ; 0 = test passed, 1 = test failed
-	rjmp   run_tests_complete_failed
+	rjmp   run_test_failed
 
+run_test_passed:
 	ldi    r25, low(test_passed)
 	push   r25
 	ldi    r25, high(test_passed)
 	push   r25
+	rjmp   run_test_print
+
+run_test_failed:
+	inc    r17
+	ldi    r25, low(test_failed)
+	push   r25
+	ldi    r25, high(test_failed)
+	push   r25
+
+run_test_print:
 	call   _printf
 	stack_free(2, r25)
 
 	jmp run_next_test
 
+run_tests_complete:
+	cpse   r17, r00
+	rjmp   run_tests_complete_failed
+
 run_tests_complete_passed:
+	push   r16
 	ldi    r25, low(test_result_passed)
 	push   r25
 	ldi    r25, high(test_result_passed)
@@ -199,14 +217,9 @@ run_tests_complete_passed:
 	debug_break(50) // slow blink = ok
 
 run_tests_complete_failed:
-	; Print 'failed'
-	ldi    r25, low(test_failed)
-	push   r25
-	ldi    r25, high(test_failed)
-	push   r25
-	call   _printf
-	stack_free(2, r25)
 	; print 'bad chip'
+	push   r16
+	push   r17
 	ldi    r25, low(test_result_failed)
 	push   r25
 	ldi    r25, high(test_result_failed)
@@ -335,8 +348,8 @@ STRING_CONSTANT_N(read_byte, 19, "read byte: '%hhx'", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(running_test, 20, "Running test '%s'...");
 STRING_CONSTANT_N(test_passed, 9, " passed", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(test_failed, 9, " FAILED", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(test_result_passed, 54, "All tests completed, this memory chip seems fine :-)", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(test_result_failed, 58, "The last test failed, this memory chip may be broken :-(", STRING_CONSTANT_CRLF);
+STRING_CONSTANT_N(test_result_passed, 72, "All %hhd tests completed successfully, this memory chip seems fine :-)", STRING_CONSTANT_CRLF);
+STRING_CONSTANT_N(test_result_failed, 67, "%hhd of out %hhd tests failed, this memory chip may be broken :-(", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(crlf, 2, STRING_CONSTANT_CRLF);
 
 string_constants_eof:
