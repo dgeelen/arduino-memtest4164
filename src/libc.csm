@@ -415,6 +415,7 @@ DEF_LABELED(__printf_do_format,                                                 
 	; zl already points at the current position                                   $\
 	; but xl points at the work area rather than the start of the current seq.    $\
 	movw   xl, zl                                                                 $\
+	ldi    r22, 2         ; Reset format flags for next round.                    $\
 	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
 	adiw   xl, 1          ; which will overflow r16 to 0 and inc z, but for x     $\
 	rjmp   __printf_next_char ; we have to do it here.                            $\
@@ -490,6 +491,7 @@ DEF_LABELED(__printf_s,                                                         
 	; switch back to normal printing                                              $\
 	andi   r23, BITINV(__printf_conversion_specifier_mask)                        $\
 	movw   zl, xl                                                                 $\
+	ldi    r22, 2         ; Reset format flags for next round.                    $\
 	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
 	adiw   xl, 1          ; which will overflow r16 to 0 and inc z, but for x     $\
 	rjmp   __printf_next_char ; we have to do it here.                            $\
