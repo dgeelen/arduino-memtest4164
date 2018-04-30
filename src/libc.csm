@@ -438,12 +438,22 @@ DEF_LABELED(__printf_do_format,                                                 
 	sts    __printf_arg_ptr+1, yl                                                 $\
 	sts    __printf_arg_ptr+0, yh ; next argument                                 $\
 	                                                                              $\
-	; write buffer (r16 is set correctly above)                                   $\
-	; at this point xl = current pos, __printf_serial_ preserves z,               $\
-	; and z needs to be restored before exit                                      $\
+	; find start of output (skip leading 0s)                                      $\
 	movw   zl, xl         ; restore z                                             $\
 	ldi    xl, low(__printf_work_area)                                            $\
 	ldi    xh, high(__printf_work_area) ; __printf_serial_write needs ptr in x    $\
+	ldi    r24, '0'                                                               $\
+__printf_do_format_skip_leading_zero:                                           $\
+	ld     r25, x+                                                                $\
+	sub    r16, r01                                                               $\
+	cp     r25, r24                                                               $\
+	breq   __printf_do_format_skip_leading_zero                                   $\
+	sbiw   xl, 1                                                                  $\
+	add    r16, r01                                                               $\
+	                                                                              $\
+	; write buffer (r16 is set correctly above)                                   $\
+	; at this point xl = current pos, __printf_serial_ preserves z,               $\
+	; and z needs to be restored before exit                                      $\
 	mov    r22, r08       ; r22 is not needed anymore (for this format specifier) $\
 	mov    r08, r01       ; always write from ram (__printf_work_area)            $\
 	; r16 must always > 0 here                                                    $\
