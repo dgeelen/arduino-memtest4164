@@ -94,6 +94,7 @@ main:
 		(( 8, "Odd bits"      , ramtest_odd_bits       )) \
 		((12, "Walking Ones"  , ramtest_walking_ones   )) \
 		((14, "Walking Zeroes", ramtest_walking_zeroes )) \
+		((10, "Addressing"    , ramtest_adressing      )) \
 	// TESTS
 
 	#define OP(i, data, elem) STRING_CONSTANT_N( \
@@ -376,6 +377,54 @@ __ramtest_walking_bits_impl_read_byte:
 __ramtest_walking_bits_impl_done:
 	mov    r25, r17
 	restore_registers(r16, r17, r18, r19, zl, zh)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Adress test                                                  ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_adressing:
+	save_registers(r16, zl, zh)
+
+	ldi    zl, 0
+	ldi    zh, 0
+__ramtest_adressing_next_addr:
+	; write address to address
+	mov    r16, zl
+	call   m4164_dram_write_byte; auto increment z
+	mov    r16, zh
+	call   m4164_dram_write_byte; auto increment z
+
+	; ..., two steps back.
+	sbiw   zl, 2*8
+
+	; verify address at address
+	mov    r16, zl
+	call   m4164_dram_read_byte; auto increment z
+	cpse   r16, r25
+	rjmp   __ramtest_adressing_fail
+	mov    r16, zh
+	call   m4164_dram_read_byte; auto increment z
+	cpse   r16, r25
+	rjmp   __ramtest_adressing_fail
+
+	; one step forward, ...
+	sbiw   zl, 2*8 - 1 ; test address per-bit
+
+	cpi    zl, 0
+	brne   __ramtest_adressing_next_addr
+	cpi    zh, 0
+	brne   __ramtest_adressing_next_addr
+
+	mov    r25, r00
+	rjmp   __ramtest_adressing_done
+
+__ramtest_adressing_fail:
+	mov    r25, r01
+
+__ramtest_adressing_done:
+	restore_registers(r16, zl, zh)
 	ret
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
