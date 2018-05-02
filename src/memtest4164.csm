@@ -88,13 +88,14 @@ main:
 	jmp run_all_tests
 
 	#define TESTS                                       \
-		((10, "All Zeroes"    , ramtest_all_zeroes     )) \
-		(( 8, "All Ones"      , ramtest_all_ones       )) \
-		(( 9, "Even bits"     , ramtest_even_bits      )) \
-		(( 8, "Odd bits"      , ramtest_odd_bits       )) \
-		((12, "Walking Ones"  , ramtest_walking_ones   )) \
-		((14, "Walking Zeroes", ramtest_walking_zeroes )) \
-		((10, "Addressing"    , ramtest_adressing      )) \
+		((10, "All Zeroes"       , ramtest_all_zeroes     )) \
+		(( 8, "All Ones"         , ramtest_all_ones       )) \
+		(( 9, "Even bits"        , ramtest_even_bits      )) \
+		(( 8, "Odd bits"         , ramtest_odd_bits       )) \
+		((12, "Walking Ones"     , ramtest_walking_ones   )) \
+		((14, "Walking Zeroes"   , ramtest_walking_zeroes )) \
+		((10, "Addressing"       , ramtest_adressing      )) \
+		((17, "Bit fade (~10min)", ramtest_bit_fade       )) \
 	// TESTS
 
 	#define OP(i, data, elem) STRING_CONSTANT_N( \
@@ -430,6 +431,31 @@ __ramtest_adressing_done:
 
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- bit fade                                                     ;;
+	;; r16 -- value                                                             ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_bit_fade:
+	save_registers(r16)
+
+	ldi    r16, 0b00000000
+	call   ramtest_fill_memory
+	call   ram_test_delay_5m
+	call   ramtest_compare_memory
+	cpse   r25, r00
+	rjmp   ramtest_bit_fade_fail
+
+	ldi    r16, 0b11111111
+	call   ramtest_fill_memory
+	call   ram_test_delay_5m
+	call   ramtest_compare_memory
+
+ramtest_bit_fade_fail:
+	restore_registers(r16)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;; Ram test -- fill memory                                                  ;;
 	;; r16 -- value                                                             ;;
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -510,6 +536,21 @@ ram_test_delay_long:
 	pop    r16
 	ret
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- delay 5m                                                     ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ram_test_delay_5m:
+	save_registers(r16, r17)
+	ldi    r16, 60*2   ; 60 is about 1 second (incl. ram refresh interrupt)
+	ldi    r17, 150   ; 150 * 2 ~= 300s = 5min
+__ram_test_delay_5m:
+	call   ram_test_delay_n
+	dec    r17
+	brne   __ram_test_delay_5m
+	restore_registers(r16, r17)
+	ret
 
 .dseg
 	serial_rx_byte: .byte 1
