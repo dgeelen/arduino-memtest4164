@@ -19,6 +19,12 @@ ISR_SET_ORG_FOR_USER_CODE()
 #include "m4164.csm"
 #include "libc.csm"
 
+.dseg
+	serial_rx_byte: .byte 1
+	m4164_config: .byte struct_m4164_config_size
+
+.cseg
+
 main:
 	; set up the stack
 	ldi    r25, low(RAMEND)
@@ -85,6 +91,19 @@ main:
 
 	sei
 
+	ldi    r25, low(welcome_message)
+	push   r25
+	ldi    r25, high(welcome_message)
+	push   r25
+	call   _printf
+	stack_free(2, r25)
+
+	; wait for a keypress
+loop:
+	mov    r16, r01
+	ldi    zl, low(serial_rx_byte)
+	ldi    zh, high(serial_rx_byte)
+	call   serial_read
 	jmp run_all_tests
 
 	#define TESTS                                       \
@@ -552,30 +571,6 @@ __ram_test_delay_5m:
 	restore_registers(r16, r17)
 	ret
 
-.dseg
-	serial_rx_byte: .byte 1
-	m4164_config: .byte struct_m4164_config_size
-
-.cseg
-
-
-loop:
-	mov    r16, r01
-	ldi    zl, low(serial_rx_byte)
-	ldi    zh, high(serial_rx_byte)
-	call  serial_read
-
-	lds    r25, serial_rx_byte
-	push   r25
-	ldi    r25, low(read_byte)
-	push   r25
-	ldi    r25, high(read_byte)
-	push   r25
-	call   _printf
-	stack_free(3, r25)
-	rjmp  loop
-
-
 error_trap:
 	break
 	debug_break(4)
@@ -590,6 +585,7 @@ error_trap:
 .endif
 .org string_constants_org
 
+STRING_CONSTANT_N(welcome_message, 74, "Welcome to the m4164 memory tester v0.1", STRING_CONSTANT_CRLF, "Press any key to begin testing.", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(read_byte, 19, "read byte: '%hhx'", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(running_test, 20, "Running test '%s'...");
 STRING_CONSTANT_N(test_passed, 9, " passed", STRING_CONSTANT_CRLF);
