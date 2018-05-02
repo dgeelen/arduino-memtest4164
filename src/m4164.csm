@@ -71,9 +71,6 @@ __m4164_config: .byte 2
 DEF_LABELED(m4164_init,                                                       $\
 	save_registers(xl, xh, r23)                                                 $\
 	                                                                            $\
-	; XXX: set data directions arduino ports                                    $\
-	                                                                            $\
-	                                                                            $\
 	sts    __m4164_config+1, zl                                                 $\
 	sts    __m4164_config+0, zh                                                 $\
 	                                                                            $\
@@ -98,6 +95,19 @@ DEF_LABELED(m4164_init,                                                       $\
 	or     r24, r25                                                             $\
 	or     xl, r25                                                              $\
 	                                                                            $\
+	                                                                            $\
+	; set data directions Arduino ports                                         $\
+	out    DDRD, r02   ; Port D is all address lines, which are all outputs     $\
+	in     r25, DDRB                                                            $\
+	mov    r23, xl     ; xl = all used pins                                     $\
+	eor    r23, r02    ; mask unused pins                                       $\
+	and    r25, r23    ; unset used pins                                        $\
+	or     r25, r24    ; r24 is all pins except Din and Dout                    $\
+	ldd    r23, z+m4164_config_Din_mask                                         $\
+	or     r25, r23    ; include Din as an output                               $\
+	out    DDRB, r25   ; set the pins as outputs                                $\
+	                                                                            $\
+	                                                                            $\
 	; disable interrupts, in case the user calls us after SEI, because          $\
 	; otherwise we wont be able to guarantee that RAS is held low for the       $\
 	; correct minimum amount of time.                                           $\
@@ -105,7 +115,7 @@ DEF_LABELED(m4164_init,                                                       $\
 	cli                                                                         $\
 	                                                                            $\
 	; r24 = bits to set, xl = bits used                                         $\
-	out    PORTD, r00                                                           $\
+	out    PORTD, r00  ; address lines to 0                                     $\
 	in     r25, PORTB  ; get current state /* XXX: quantum collapse simavr? */  $\
 	eor    xl, r02     ; xl = bits *not* used                                   $\
 	and    r25, xl     ; clear all used bits                                    $\
