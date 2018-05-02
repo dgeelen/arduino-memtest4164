@@ -135,7 +135,7 @@ simulation: $(TARGETS)
 	@echo "$(COLOR_CYAN)[ simavr    ]$(COLOR_RESET) Running simulation..."
 	@objcopy --input-target binary --output-target ihex $< $(TARGETS:.bin=_simavr.hex)
 #	PORTB=0x05, PORTD=0x0b, +32 = 0x25 & 0x2b
-	../simavr/simavr/run_avr --trace -v -v -v -v -v --mcu atmega328p --freq 16000000 -ff $(TARGETS:.bin=_simavr.hex) \
+	simavr -v --mcu atmega328p --freq 16000000 -ff $(TARGETS:.bin=_simavr.hex)    \
 		--vcd-trace-file $(BUILDDIR)/memtest4164.vcd                                \
 		--add-vcd-trace LED=trace@0x25/0x20                                         \
 		--add-vcd-trace ~WE=trace@0x25/0x04                                         \
