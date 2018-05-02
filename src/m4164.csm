@@ -62,8 +62,6 @@
 ;
 .dseg
 __m4164_config: .byte 2
-; last written row addr, used to preserve state across refresh cycles
-;__m4164_row_addr: .byte 1
 .cseg
 
 
