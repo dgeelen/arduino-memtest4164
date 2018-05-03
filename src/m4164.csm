@@ -97,6 +97,8 @@ DEF_LABELED(m4164_init,                                                       $\
 	                                                                            $\
 	                                                                            $\
 	; set data directions Arduino ports                                         $\
+	out    PINB, r00   ; Make sure PINxn are in known state (otherwise unused)  $\
+	out    PIND, r00   ;                                                        $\
 	out    DDRD, r02   ; Port D is all address lines, which are all outputs     $\
 	in     r25, DDRB                                                            $\
 	mov    r23, xl     ; xl = all used pins                                     $\
@@ -264,7 +266,7 @@ DEF_LABELED(m4164_dram_read_bit,                                              $\
 	out    PORTB, r24  ; assert CAS                       /* CAS */   /*   3 */ $\
 	eor    r24, r20    ; set RAS bit                      /*   1 */             $\
 	or     r24, r21    ; set CAS bit                      /*   2 */             $\
-	in     r25, PORTB  ; read bit                                               $\
+	in     r25, PINB   ; read bit                                               $\
 	out    SREG, r23   ; restore IE flag (next instruction is still executed)   $\
 	out    PORTB, r24  ; disable RAS, CAS                                       $\
 	                                                                            $\
@@ -397,7 +399,7 @@ __m4164_dram_read_byte_next_bit:                                              $\
 	eor    yl, r23     ; set CAS bit (~CAS)                           /*   1 */ $\
 	rol    r25         ; prepare for next bit                         /*   2 */ $\
 	adiw   zl, 1       ; prepare for next bit (after rol!)                      $\
-	in     r20, PORTB  ; read bit                                               $\
+	in     r20, PINB   ; read bit                                               $\
 	out    PORTB, yl   ; de-assert CAS                                          $\
 	                                                                            $\
 	and    r20, r21    ; test bit into Z                                        $\
