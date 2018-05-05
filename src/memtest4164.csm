@@ -109,6 +109,12 @@ loop:
 	#define TESTS                                       \
 		((10, "All Zeroes"       , ramtest_all_zeroes     )) \
 		(( 8, "All Ones"         , ramtest_all_ones       )) \
+		((12, "Even nibbles"     , ramtest_even_nibbles   )) \
+		((11, "Odd nibbles"      , ramtest_odd_nibbles    )) \
+		((14, "Central nibble"   , ramtest_central_nibble )) \
+		((12, "Outer crumbs"     , ramtest_outer_crumbs   )) \
+		((11, "Even crumbs"      , ramtest_even_crumbs    )) \
+		((10, "Odd crumbs"       , ramtest_odd_crumbs     )) \
 		(( 9, "Even bits"        , ramtest_even_bits      )) \
 		(( 8, "Odd bits"         , ramtest_odd_bits       )) \
 		((12, "Walking Ones"     , ramtest_walking_ones   )) \
@@ -285,6 +291,90 @@ ramtest_all_zeroes:
 ramtest_all_ones:
 	save_registers(r16)
 	ldi    r16, 0xff
+	call   ramtest_fill_memory
+	call   ram_test_delay_short
+	call   ramtest_compare_memory
+	restore_registers(r16)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Even nibbles                                                 ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_even_nibbles:
+	save_registers(r16)
+	ldi    r16, 0b11110000
+	call   ramtest_fill_memory
+	call   ram_test_delay_short
+	call   ramtest_compare_memory
+	restore_registers(r16)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Odd nibbles                                                  ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_odd_nibbles:
+	save_registers(r16)
+	ldi    r16, 0b00001111
+	call   ramtest_fill_memory
+	call   ram_test_delay_short
+	call   ramtest_compare_memory
+	restore_registers(r16)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Central nibble                                               ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_central_nibble:
+	save_registers(r16)
+	ldi    r16, 0b00111100
+	call   ramtest_fill_memory
+	call   ram_test_delay_short
+	call   ramtest_compare_memory
+	restore_registers(r16)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Outer crumbs                                                 ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_outer_crumbs:
+	save_registers(r16)
+	ldi    r16, 0b11000011
+	call   ramtest_fill_memory
+	call   ram_test_delay_short
+	call   ramtest_compare_memory
+	restore_registers(r16)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Even crumbs                                                  ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_even_crumbs:
+	save_registers(r16)
+	ldi    r16, 0b11001100
+	call   ramtest_fill_memory
+	call   ram_test_delay_short
+	call   ramtest_compare_memory
+	restore_registers(r16)
+	ret
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;; Ram test -- Odd crumbs                                                   ;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ramtest_odd_crumbs:
+	save_registers(r16)
+	ldi    r16, 0b00110011
 	call   ramtest_fill_memory
 	call   ram_test_delay_short
 	call   ramtest_compare_memory
