@@ -447,6 +447,9 @@ __printf_do_format_skip_leading_zero:                                           
 	ld     r25, x+                                                                $\
 	sub    r16, r01                                                               $\
 	cp     r25, r24                                                               $\
+	; ensure we write at least one character, since otherwise we cannot print     $\
+	; 0 itself.                                                                   $\
+	cpse   r16, r00                                                               $\
 	breq   __printf_do_format_skip_leading_zero                                   $\
 	sbiw   xl, 1                                                                  $\
 	add    r16, r01                                                               $\
