@@ -588,23 +588,41 @@ __ramtest_fill_memory_next_byte:
 	;; r16 -- expected value                                                    ;;
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ramtest_compare_memory:
-	save_registers(r23, zl, zh)
+	save_registers(zl, zh)
 	ldi    zl, 0
 	ldi    zh, 0
-	mov    r23, r00
 __ramtest_compare_memory_next_byte:
 	call   m4164_dram_read_byte; auto increment z
 	cpse   r16, r25
-	mov    r23, r01
+	rjmp   __ramtest_compare_memory_unexpected_value
 	cpi    zl, 0
 	brne   __ramtest_compare_memory_next_byte
 	cpi    zh, 0
 	brne   __ramtest_compare_memory_next_byte
-	mov    r25, r23
-	restore_registers(r23, zl, zh)
+
+	mov    r25, r00
+	rjmp   __ramtest_compare_memory_done
+
+__ramtest_compare_memory_unexpected_value:
+	push   r25
+	push   r16
+	sbiw   zl, 8
+	push   zl
+	push   zh
+	ldi    r25, low(ramtest_compare_memory_badness)
+	push   r25
+	ldi    r25, high(ramtest_compare_memory_badness)
+	push   r25
+	call   _printf
+	stack_free(6, zl, zh, r25)
+	mov    r25, r01
+
+__ramtest_compare_memory_done:
+	restore_registers(zl, zh)
 	ret
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+STRING_CONSTANT_N(ramtest_compare_memory_badness, 46, " at address 0x%x: expected %hhx, got %hhx --> ")
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;; Ram test -- delay                                                        ;;
