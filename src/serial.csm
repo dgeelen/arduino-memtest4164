@@ -59,21 +59,15 @@ DEF_LABELED(_serial_init,                                                       
 	; Data reg empty interrupt                                                    $\
 	; Initially disable Rx                                                        $\
 	; Initially disable Tx                                                        $\
-	; Character size bit 2 off                                                    $\
 	lds   r25, UCSR0B ; Memory mapped                                             $\
-	andi  r25, BITINV(1<<UCSZ02 | 1<<RXEN0 | 1<<TXEN0 | 1<<UDRIE0 | 1<<TXCIE0)    $\
+	andi  r25, BITINV(1<<RXEN0 | 1<<TXEN0 | 1<<UDRIE0 | 1<<TXCIE0)                $\
 	ori   r25, (1<<RXCIE0)                                                        $\
 	sts   UCSR0B, r25                                                             $\
 	                                                                              $\
-	; Set frame format 115200,8,N,1,:                                             $\
 	; Asynchronous USART                                                          $\
-	; No parity                                                                   $\
-	; 1 stop bit                                                                  $\
-	; 8 data bits                                                                 $\
 	; Clock polarity 0 (recommended)                                              $\
 	lds   r25, UCSR0C ; Memory mapped                                             $\
-	andi  r25, BITINV(1<<UMSEL00 | 1<<UMSEL01 | 1<<UPM00 | 1<<UPM01 | 1<<USBS0 | 1<<UCPOL0) $\
-	ori   r25, (1<<UCSZ00 | 1<<UCSZ01)                                            $\
+	andi  r25, BITINV(1<<UMSEL00 | 1<<UMSEL01 | 1<<UCPOL0)                        $\
 	sts   UCSR0C, r25                                                             $\
 	                                                                              $\
 	save_registers(zl, zh)                                                        $\
@@ -93,13 +87,24 @@ DEF_LABELED(_serial_init,                                                       
 	ret                                                                           $\
 )
 
-#define serial_init(baud_rate) DEF_LABELED(serial_init,                         $\
+#define serial_init(                                                             \
+	baud_rate,                                                                     \
+	parity,                                                                        \
+	data_bits,                                                                     \
+	stop_bits                                                                      \
+) DEF_LABELED(serial_init,                                                      $\
 	save_registers(r16, r17, r18, r19)                                            $\
 	ldi    r16, BYTE1(baud_rate)                                                  $\
 	ldi    r17, BYTE2(baud_rate)                                                  $\
 	ldi    r18, BYTE3(baud_rate)                                                  $\
 	ldi    r19, BYTE4(baud_rate)                                                  $\
 	call   _serial_init                                                           $\
+	ldi    r16, serial_parity_mode_ ## parity                                     $\
+	call   serial_set_parity                                                      $\
+	ldi    r16, serial_data_bits_ ## data_bits                                    $\
+	call   serial_set_data_bits                                                   $\
+	ldi    r16, serial_stop_bits_ ## stop_bits                                    $\
+	call   serial_set_stop_bits                                                   $\
 	restore_registers(r16, r17, r18, r19)                                         $\
 )
 
@@ -151,6 +156,57 @@ DEF_LABELED(serial_rx_disable,                                                  
 	lds   r25, UCSR0B ; Memory mapped                                             $\
 	andi  r25, BITINV(1<<RXEN0)                                                   $\
 	sts   UCSR0B, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+; r16 is parity mode
+.define serial_parity_mode_none (0<<UPM00 | 0<<UPM01)
+.define serial_parity_mode_even (1<<UPM00 | 0<<UPM01)
+.define serial_parity_mode_odd  (1<<UPM00 | 1<<UPM01)
+#define serial_parity_mode_N serial_parity_mode_none
+#define serial_parity_mode_E serial_parity_mode_even
+#define serial_parity_mode_O serial_parity_mode_odd
+DEF_LABELED(serial_set_parity,                                                  $\
+	lds   r25, UCSR0C ; Memory mapped                                             $\
+	andi  r25, BITINV(1<<UPM00 | 1<<UPM01)                                        $\
+	or    r25, r16                                                                $\
+	sts   UCSR0C, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+; r16 is #data_bits
+.define serial_data_bits_5 (0<<UCSZ02 | 0<<UCSZ01 | 0<<UCSZ00)
+.define serial_data_bits_6 (0<<UCSZ02 | 0<<UCSZ01 | 1<<UCSZ00)
+.define serial_data_bits_7 (0<<UCSZ02 | 1<<UCSZ01 | 0<<UCSZ00)
+.define serial_data_bits_8 (0<<UCSZ02 | 1<<UCSZ01 | 1<<UCSZ00)
+.define serial_data_bits_9 (1<<UCSZ02 | 1<<UCSZ01 | 1<<UCSZ00)
+DEF_LABELED(serial_set_data_bits,                                               $\
+	lds   r25, UCSR0C ; Memory mapped                                             $\
+	mov   r24, r16                                                                $\
+	andi  r24,       (1<<UCSZ01 | 1<<1<<UCSZ00)                                   $\
+	andi  r25, BITINV(1<<UCSZ01 | 1<<1<<UCSZ00)                                   $\
+	or    r25, r24                                                                $\
+	sts   UCSR0C, r25                                                             $\
+	lds   r25, UCSR0B ; Memory mapped                                             $\
+	mov   r24, r16                                                                $\
+	andi  r24,       (1<<UCSZ02)                                                  $\
+	andi  r25, BITINV(1<<UCSZ02)                                                  $\
+	or    r25, r24                                                                $\
+	sts   UCSR0B, r25                                                             $\
+	ret                                                                           $\
+)
+
+
+; r16 is #stop bits
+.define serial_stop_bits_1 (0<<USBS0)
+.define serial_stop_bits_2 (1<<USBS0)
+DEF_LABELED(serial_set_stop_bits,                                               $\
+	lds   r25, UCSR0C ; Memory mapped                                             $\
+	andi  r25, BITINV(1<<USBS0)                                                   $\
+	or    r25, r16                                                                $\
+	sts   UCSR0C, r25                                                             $\
 	ret                                                                           $\
 )
 
