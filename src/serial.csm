@@ -81,9 +81,6 @@ DEF_LABELED(_serial_init,                                                       
 	restore_registers(zl, zh)                                                     $\
 	                                                                              $\
 	call serial_flush                                                             $\
-	call serial_set_baudrate                                                      $\
-	call serial_rx_enable                                                         $\
-	call serial_tx_enable                                                         $\
 	ret                                                                           $\
 )
 
@@ -94,10 +91,6 @@ DEF_LABELED(_serial_init,                                                       
 	stop_bits                                                                      \
 ) DEF_LABELED(serial_init,                                                      $\
 	save_registers(r16, r17, r18, r19)                                            $\
-	ldi    r16, BYTE1(baud_rate)                                                  $\
-	ldi    r17, BYTE2(baud_rate)                                                  $\
-	ldi    r18, BYTE3(baud_rate)                                                  $\
-	ldi    r19, BYTE4(baud_rate)                                                  $\
 	call   _serial_init                                                           $\
 	ldi    r16, serial_parity_mode_ ## parity                                     $\
 	call   serial_set_parity                                                      $\
@@ -105,6 +98,13 @@ DEF_LABELED(_serial_init,                                                       
 	call   serial_set_data_bits                                                   $\
 	ldi    r16, serial_stop_bits_ ## stop_bits                                    $\
 	call   serial_set_stop_bits                                                   $\
+	ldi    r16, BYTE1(baud_rate)                                                  $\
+	ldi    r17, BYTE2(baud_rate)                                                  $\
+	ldi    r18, BYTE3(baud_rate)                                                  $\
+	ldi    r19, BYTE4(baud_rate)                                                  $\
+	call   serial_set_baudrate                                                    $\
+	call   serial_rx_enable                                                       $\
+	call   serial_tx_enable                                                       $\
 	restore_registers(r16, r17, r18, r19)                                         $\
 )
 
