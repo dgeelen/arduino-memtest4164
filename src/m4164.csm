@@ -389,7 +389,7 @@ DEF_LABELED(m4164_dram_read_byte,                                             $\
 	; Tcp (CAS precharge time page mode) is 60ns (0.96 cycles)                  $\
 	; Trcd (RAS to CAS delay) is 25 < n < 75ns (non-normative)                  $\
 	ldi    r24, 8      ; 8 bits to input                              /*   1 */ $\
-	sub    r25, r25    ; r25 will receive the result, clear carry     /*   2 */ $\
+	clr    r25         ; r25 will receive the result                  /*   2 */ $\
 __m4164_dram_read_byte_next_bit:                                              $\
 	out    PORTD, zl   ; Set column addr, Tasc is 0ns, Tcah is 20ns   /*   3 */ $\
 	eor    yl, r23     ; clear CAS bit                                          $\
@@ -397,8 +397,8 @@ __m4164_dram_read_byte_next_bit:                                              $\
 	; Tcas (CAS pulse width) is 75ns (1.2 cycles)                               $\
 	; Tcac (access time from CAS) is 75ns (1.2 cycles)                          $\
 	eor    yl, r23     ; set CAS bit (~CAS)                           /*   1 */ $\
-	rol    r25         ; prepare for next bit                         /*   2 */ $\
-	adiw   zl, 1       ; prepare for next bit (after rol!)                      $\
+	lsl    r25         ; prepare for next bit                         /*   2 */ $\
+	adiw   zl, 1       ;                                                        $\
 	in     r20, PINB   ; read bit                                               $\
 	out    PORTB, yl   ; de-assert CAS                                          $\
 	                                                                            $\
