@@ -389,7 +389,7 @@ DEF_LABELED(m4164_dram_read_byte,                                             $\
 	; Tcp (CAS precharge time page mode) is 60ns (0.96 cycles)                  $\
 	; Trcd (RAS to CAS delay) is 25 < n < 75ns (non-normative)                  $\
 	ldi    r24, 8      ; 8 bits to input                              /*   1 */ $\
-	sub    r25,r25     ; r25 will receive the result, clear carry     /*   2 */ $\
+	sub    r25, r25    ; r25 will receive the result, clear carry     /*   2 */ $\
 __m4164_dram_read_byte_next_bit:                                              $\
 	out    PORTD, zl   ; Set column addr, Tasc is 0ns, Tcah is 20ns   /*   3 */ $\
 	eor    yl, r23     ; clear CAS bit                                          $\
@@ -404,7 +404,7 @@ __m4164_dram_read_byte_next_bit:                                              $\
 	                                                                            $\
 	and    r20, r21    ; test bit into Z                                        $\
 	breq   __m4164_dram_read_byte_bit_0                                         $\
-	inc     r25        ; copy from Z into r25                                   $\
+	inc    r25         ; copy from Z into r25                                   $\
 __m4164_dram_read_byte_bit_0:                                                 $\
 	                                                                            $\
 	dec    r24                                                                  $\
@@ -416,7 +416,6 @@ __m4164_dram_read_byte_bit_0:                                                 $\
 	                                                                            $\
 	; Trp (100ns) and Tcpn (25ns) are covered by function exit                  $\
 	restore_registers(r20, r21, r22, r23, yl, yh)                               $\
-	                                                                            $\
 	ret                                                                         $\
 )
 
@@ -463,6 +462,5 @@ __m4164_refresh_done:                                                         $\
 	out    PORTB, zh   ; disable RAS                                 /* ~RAS */ $\
 	out    PORTD, zl   ; restore address                                        $\
 	restore_registers(r24, r25, zl, zh)                                         $\
-	                                                                            $\
 	ret                                                                         $\
 )
