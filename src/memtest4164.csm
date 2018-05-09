@@ -78,11 +78,11 @@ main:
 	ldi    zl, low(m4164_config)
 	ldi    zh, high(m4164_config)
 	ldi    r25, 128         $   std    z+m4164_config_row_count,    r25
-	ldi    r25, 1<<PORTB2   $   std    z+m4164_config_WE_mask,      r25
-	ldi    r25, 1<<PORTB4   $   std    z+m4164_config_Din_mask,     r25
-	ldi    r25, 1<<PORTB0   $   std    z+m4164_config_Dout_mask,    r25
-	ldi    r25, 1<<PORTB3   $   std    z+m4164_config_CAS_mask,     r25
-	ldi    r25, 1<<PORTB1   $   std    z+m4164_config_RAS_mask,     r25
+	ldi    r25, 1<<PORTC2   $   std    z+m4164_config_WE_mask,      r25
+	ldi    r25, 1<<PORTC4   $   std    z+m4164_config_Din_mask,     r25
+	ldi    r25, 1<<PORTC0   $   std    z+m4164_config_Dout_mask,    r25
+	ldi    r25, 1<<PORTC3   $   std    z+m4164_config_CAS_mask,     r25
+	ldi    r25, 1<<PORTC1   $   std    z+m4164_config_RAS_mask,     r25
 
 	ldi    zl, low(m4164_config)
 	ldi    zh, high(m4164_config)
