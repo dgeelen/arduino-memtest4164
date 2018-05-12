@@ -1,0 +1,306 @@
+/******************************************************************************
+   Display driver for Adafruit-style OLED screens using a SSD1306 chip.
+
+   This driver uses hardware SPI to talk to the display, but the reset and
+   data/command toggle lines are user configurable.
+
+ ******************************************************************************/
+#pragma once
+
+#include "utility_macros.csm"
+#include "string_constant.csm"
+
+#define SSD1306_CMD_ENTIRE_DISPLAY_ON                     (0xa4) // display RAM contents
+#define SSD1306_CMD_ENTIRE_DISPLAY_ON_FORCE               (0xa5) // ignore RAM
+
+#define SSD1306_CMD_SET_NORMAL_DISPLAY                    (0xa6)
+#define SSD1306_CMD_SET_INVERSE_DISPLAY                   (0xa7)
+
+#define SSD1306_CMD_SET_MULTIPLEX_RATIO                   (0xa8)
+
+#define SSD1306_CMD_SET_DISPLAY_OFF                       (0xae)
+#define SSD1306_CMD_SET_DISPLAY_ON                        (0xaf)
+
+#define SSD1306_CMD_SET_DISPLAY_OFFSET                    (0xd3)
+#define SSD1306_CMD_SET_DISPLAY_START_LINE                (0x40) // 0x40..0x7f
+
+#define SSD1306_CMD_SET_DCDR_OSCF                         (0xd5) // Set Display Clock Divide Ratio / Oscillator Frequency
+#define SSD1306_CMD_SET_PRE_CHARGE_PERIOD                 (0xd9)
+#define SSD1306_CMD_SET_V_COMH_DESELECT_LEVEL             (0xdb)
+#define SSD1306_CMD_V_COMH_DESELECT_LEVEL_65              (0x00)
+#define SSD1306_CMD_V_COMH_DESELECT_LEVEL_77              (0x20)
+#define SSD1306_CMD_V_COMH_DESELECT_LEVEL_83              (0x30)
+#define SSD1306_CMD_V_COMH_DESELECT_LEVEL_100             (0x40) // Undocumented, but Adafruit does this... c.f. https://github.com/adafruit/Adafruit_SSD1306/issues/42
+
+#define SSD1306_CMD_CHARGE_PUMP_SETTING                   (0x8d)
+#define SSD1306_CMD_CHARGE_PUMP_EXTERNAL_VCC              (0x10)
+#define SSD1306_CMD_CHARGE_PUMP_INTERNAL_VCC              (0x14)
+
+#define SSD1306_CMD_SET_MEMORY_ADDRESSING_MODE            (0x20)
+#define SSD1306_CMD_MEMORY_ADDRESSING_MODE_HORIZONTAL     (0x00)
+#define SSD1306_CMD_MEMORY_ADDRESSING_MODE_VERTICAL       (0x01)
+#define SSD1306_CMD_MEMORY_ADDRESSING_MODE_PAGE           (0x02)
+
+#define SSD1306_CMD_DEACTIVATE_SCROLL                     (0x2e)
+
+#define SSD1306_CMD_SET_SEGMENT_REMAP_OFF                 (0xa0)
+#define SSD1306_CMD_SET_SEGMENT_REMAP_ON                  (0xa1)
+
+#define SSD1306_CMD_SET_COM_OUTPUT_SCAN_DIRECTION_FWD     (0xc0)
+#define SSD1306_CMD_SET_COM_OUTPUT_SCAN_DIRECTION_REV     (0xc8)
+
+#define SSD1306_CMD_SET_COM_PINS_HARDWARE_CONFIGURATION   (0xda)
+#define SSD1306_CMD_COM_PINS_SEQUENTIAL                   (0x02)
+#define SSD1306_CMD_COM_PINS_ALTERNATIVE                  (0x12)
+#define SSD1306_CMD_COM_PINS_LR_REMAP_OFF                 (0x02)
+#define SSD1306_CMD_COM_PINS_LR_REMAP_ON                  (0x22)
+
+#define SSD1306_CMD_SET_CONTRAST_CONTROL_FOR_BANK0        (0x81)
+
+#define SSD1306_CMD_SET_COLUMN_ADDRESS                    (0x21)
+#define SSD1306_CMD_SET_PAGE_ADDRESS                      (0x22)
+
+
+
+#define ssd1306_config(                                                          \
+	reset_port,       /* RES */                                                    \
+	reset_pin,                                                                     \
+	command_port,     /* DC  */                                                    \
+	command_pin                                                                    \
+)                                                                                \
+	.define ssd1306_config_reset_port     reset_port                              $\
+	.define ssd1306_config_reset_pin      reset_pin                               $\
+	.define ssd1306_config_command_port   command_port                            $\
+	.define ssd1306_config_command_pin    command_pin                             $\
+// ssd1306_config
+
+
+DEF_LABELED(_ssd1306_cmd,                                                       $\
+	; enable command mode                                                         $\
+	in     r25, ssd1306_config_command_port                                       $\
+	andi   r25, BITINV(1<<ssd1306_config_command_pin)                             $\
+	out    ssd1306_config_command_port, r25                                       $\
+	                                                                              $\
+	call   __ssd1306_spi_tx                                                       $\
+	                                                                              $\
+	; enable data mode                                                            $\
+	in     r25, ssd1306_config_command_port                                       $\
+	ori    r25, 1<<ssd1306_config_command_pin                                     $\
+	out    ssd1306_config_command_port, r25                                       $\
+	                                                                              $\
+	ret                                                                           $\
+)
+
+#define ssd1306_cmd(n) DEF_LABELED(; ssd1306_cmd n,                             $\
+	ldi    r24, n                                                                 $\
+	call   _ssd1306_cmd                                                           $\
+)
+
+
+/*
+DEF_LABELED(_ssd1306_data,                                                      $\
+)
+*/
+
+#define ssd1306_data(n) DEF_LABELED(; ssd1306_cmd n,                            $\
+	ldi    r24, n                                                                 $\
+	call   __ssd1306_spi_tx                                                       $\
+)
+
+
+; Transmits the byte in r24 out over SPI, preserves r24
+DEF_LABELED(__ssd1306_spi_tx,                                                   $\
+	; Start transmission of data (r16)                                            $\
+	out    SPDR, r24                                                              $\
+	                                                                              $\
+	; Wait for transmission complete                                              $\
+__ssd1306_spi_tx_wait:                                                          $\
+	in     r25, SPSR                                                              $\
+	sbrs   r25, SPIF                                                              $\
+	rjmp   __ssd1306_spi_tx_wait                                                  $\
+	                                                                              $\
+	ret                                                                           $\
+)
+
+
+DEF_LABELED(_ssd1306_clear,                                                     $\
+	save_registers(r16, r17)                                                      $\
+	                                                                              $\
+	ldi    r16, 128 / 8                                                           $\
+__ssd1306_clear_x:                                                              $\
+	ldi    r17, 64                                                                $\
+__ssd1306_clear_y:                                                              $\
+	call   __ssd1306_spi_tx ; preserves r24                                       $\
+	dec    r17                                                                    $\
+	brne   __ssd1306_clear_y                                                      $\
+	dec    r16                                                                    $\
+	brne   __ssd1306_clear_x                                                      $\
+	                                                                              $\
+	restore_registers(r16, r17)                                                   $\
+	ret                                                                           $\
+)                                                                               $\
+
+#define ssd1306_clear(x) DEF_LABELED(; ssd1306_clear,                           $\
+	ldi    r24, x                                                                 $\
+	call   _ssd1306_clear                                                         $\
+)                                                                               $\
+
+
+DEF_LABELED(ssd1306_reset,                                                      $\
+	; begin with making sure reset is high                                        $\
+	in     r25, ssd1306_config_reset_port                                         $\
+	ori    r25, 1<<ssd1306_config_reset_pin                                       $\
+	out    ssd1306_config_reset_port, r25                                         $\
+	                                                                              $\
+	ldi    r25, 0xff ; overkill                                                   $\
+ssd1306_reset_delay_0:                                                          $\
+	dec    r25                                                                    $\
+	brne   ssd1306_reset_delay_0                                                  $\
+	                                                                              $\
+	; make sure reset is low for at least 3us (48 clock ticks at 16MHz)           $\
+	in     r25, ssd1306_config_reset_port                                         $\
+	andi   r25, BITINV(1<<ssd1306_config_reset_pin)                               $\
+	out    ssd1306_config_reset_port, r25                                         $\
+	                                                                              $\
+	ldi    r25, 0xff ; overkill                                                   $\
+ssd1306_reset_delay_1:                                                          $\
+	dec    r25                                                                    $\
+	brne   ssd1306_reset_delay_1                                                  $\
+	                                                                              $\
+	in     r25, ssd1306_config_reset_port                                         $\
+	ori    r25, 1<<ssd1306_config_reset_pin                                       $\
+	out    ssd1306_config_reset_port, r25                                         $\
+	                                                                              $\
+	ldi    r25, 0xff ; overkill                                                   $\
+ssd1306_reset_delay_2:                                                          $\
+	dec    r25                                                                    $\
+	brne   ssd1306_reset_delay_2                                                  $\
+	                                                                              $\
+	                                                                              $\
+	                                                                              $\
+	; init sequence adapted from Adafruit library                                 $\
+	ssd1306_cmd(SSD1306_CMD_SET_DISPLAY_OFF)                                      $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_DCDR_OSCF)                                        $\
+	ssd1306_cmd(0x80)                                                             $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_MULTIPLEX_RATIO)                                  $\
+	ssd1306_cmd(63)                                                               $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_DISPLAY_OFFSET)                                   $\
+	ssd1306_cmd(0x00)                                                             $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_DISPLAY_START_LINE | 0x00)                        $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_CHARGE_PUMP_SETTING)                                  $\
+	ssd1306_cmd(SSD1306_CMD_CHARGE_PUMP_INTERNAL_VCC)                             $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_MEMORY_ADDRESSING_MODE)                           $\
+	ssd1306_cmd(SSD1306_CMD_MEMORY_ADDRESSING_MODE_HORIZONTAL)                    $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_SEGMENT_REMAP_ON)                                 $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_COM_OUTPUT_SCAN_DIRECTION_REV)                    $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_COM_PINS_HARDWARE_CONFIGURATION)                  $\
+	ssd1306_cmd(                                                                   \
+		SSD1306_CMD_COM_PINS_ALTERNATIVE |                                           \
+		SSD1306_CMD_COM_PINS_LR_REMAP_OFF                                            \
+	)                                                                             $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_CONTRAST_CONTROL_FOR_BANK0)                       $\
+	ssd1306_cmd(0x7f) /* 50%, adafruit uses 0xcf ? */                             $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_PRE_CHARGE_PERIOD)                                $\
+	ssd1306_cmd((0x0f << 4) | (0x01 << 0))                                        $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_V_COMH_DESELECT_LEVEL)                            $\
+	ssd1306_cmd(SSD1306_CMD_V_COMH_DESELECT_LEVEL_65)                             $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_ENTIRE_DISPLAY_ON)                                    $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_NORMAL_DISPLAY)                                   $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_DEACTIVATE_SCROLL)                                    $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_DISPLAY_ON)                                       $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_COLUMN_ADDRESS)                                   $\
+	ssd1306_cmd(0)   /* Column start address (0 = reset)                 */       $\
+	ssd1306_cmd(127) /* Column end address (127 = reset = lcd width - 1) */       $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_PAGE_ADDRESS)                                     $\
+	ssd1306_cmd(0)   /* Page start address (0 = reset) */                         $\
+	ssd1306_cmd(7)   /* Page end address               */                         $\
+	                                                                              $\
+	; and clear the screen                                                        $\
+	ssd1306_clear(0x00)                                                           $\
+	                                                                              $\
+	ret                                                                           $\
+)
+
+
+;
+; Initialise the usart for SPI
+;
+DEF_LABELED(_ssd1306_init,                                                      $\
+	save_registers(r16, r17, r18, r19)                                            $\
+	                                                                              $\
+	; Set reset as output, low                                                    $\
+	in     r25, ssd1306_config_reset_port - 1 ; -1 to select DDR                  $\
+	ori    r25, 1<<ssd1306_config_reset_pin                                       $\
+	out    ssd1306_config_reset_port - 1, r25                                     $\
+	in     r25, ssd1306_config_reset_port                                         $\
+	andi   r25, BITINV(1<<ssd1306_config_reset_pin)                               $\
+	out    ssd1306_config_reset_port, r25                                         $\
+	                                                                              $\
+	; Set command as output, high (send data by default)                          $\
+	in     r25, ssd1306_config_command_port - 1 ; -1 to select DDR                $\
+	ori    r25, 1<<ssd1306_config_command_pin                                     $\
+	out    ssd1306_config_command_port - 1, r25                                   $\
+	in     r25, ssd1306_config_command_port                                       $\
+	ori    r25, 1<<ssd1306_config_command_pin                                     $\
+	out    ssd1306_config_command_port, r25                                       $\
+	                                                                              $\
+	; Set clock and data as output                                                $\
+	; Set SS high, SCK and MOSI low (basically Spi.begin())                       $\
+	in     r25, DDRB                                                              $\
+	ori    r25, (1<<PORTB2) | /* SS, not used but must be high */                  \
+	            (1<<PORTB3) | /* MOSI, Data */                                     \
+	            (1<<PORTB5)   /* SCK, Clock */                                    $\
+	out    DDRB, r25                                                              $\
+	in     r25, PORTB                                                             $\
+	ori    r25, (1<<PORTB2)   /* SS, not used but must be high */                 $\
+	andi   r25, BITINV(                                                            \
+	              (1<<PORTB3) | /* MOSI, Data */                                   \
+	              (1<<PORTB5)   /* SCK, Clock */                                   \
+	            )                                                                 $\
+	out    PORTB, r25                                                             $\
+	                                                                              $\
+	; make sure SPI module is enabled                                             $\
+	lds    r25, PRR                                                               $\
+	andi   r25, (1<<PRSPI)                                                        $\
+	sts    PRR, r25                                                               $\
+	                                                                              $\
+	; Enable SPI, Master, set clock rate fck/16                                   $\
+	ldi    r25, (0<<SPIE)|                                                         \
+	            (1<<SPE )|                                                         \
+	            (0<<DORD)|                                                         \
+	            (1<<MSTR)|                                                         \
+	            (0<<CPOL)|                                                         \
+	            (0<<CPHA)|                                                         \
+	            (1<<SPR1)|                                                         \
+	            (1<<SPR0)                                                         $\
+	out    SPCR, r25                                                              $\
+	                                                                              $\
+	; actual chip initialisation                                                  $\
+	call   ssd1306_reset                                                          $\
+	                                                                              $\
+	restore_registers(r16, r17, r18, r19)                                         $\
+	ret                                                                           $\
+)
+
+
+#define ssd1306_init() DEF_LABELED(ssd1306_init,                                $\
+	call   _ssd1306_init                                                          $\
+)
