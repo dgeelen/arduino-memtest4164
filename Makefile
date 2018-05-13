@@ -69,7 +69,7 @@ all: $(TARGET_DEPS) $(TARGETS)
 # http://sunsite.ualberta.ca/Documentation/Gnu/make-3.79/html_chapter/make_4.html
 $(DEPDIR)/%$(ASM_SOURCE_EXT).d: $(SRCDIR)/%$(ASM_SOURCE_EXT)
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)   Scanning preprocess-time dependencies for $<"
-	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.pp_asm"
+	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.pp_asm $@"
 # Next line might not be needed and lead to excessively long lines:
 	@sed -Ee 's: *$$::' -e ':\\$$:;N;s:\\\n: :' -e 's: +: :g' -i $@
 # next line from http://make.paulandlesley.org/autodep.html
@@ -80,7 +80,7 @@ $(DEPDIR)/%$(ASM_SOURCE_EXT).d: $(SRCDIR)/%$(ASM_SOURCE_EXT)
 # http://sunsite.ualberta.ca/Documentation/Gnu/make-3.79/html_chapter/make_4.html
 $(DEPDIR)/%$(CPP_SOURCE_EXT).d: $(SRCDIR)/%$(CPP_SOURCE_EXT)
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)   Scanning compile-time dependencies for $<"
-	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.o"
+	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.o $@"
 # Next line might not be needed and lead to excessively long lines:
 	@sed -Ee 's: *$$::' -e ':\\$$:;N;s:\\\n: :' -e 's: +: :g' -i $@
 # next line from http://make.paulandlesley.org/autodep.html
