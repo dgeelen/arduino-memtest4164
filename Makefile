@@ -31,17 +31,20 @@ COLOR_CYAN=$(shell echo -e '\033[01;36m')
 COLOR_YELLOW=$(shell echo -e '\033[01;33m')
 
 #watch order here, CPP_SOURCE_FILES set last because the others use it
-CPP_OBJ_FILES    := $(CPP_SOURCE_FILES:%.cpp=$(BUILDDIR)/%.o)
-CPP_DEP_FILES    := $(CPP_SOURCE_FILES:%=$(DEPDIR)/%.d)
-CPP_SOURCE_FILES := $(CPP_SOURCE_FILES:%$(CPP_SOURCE_EXT)=$(SRCDIR)/%$(CPP_SOURCE_EXT))
-CPP_TARGETS      := $(CPP_TARGETS:%=$(BUILDDIR)/%)
-ASM_TARGETS      := $(ASM_TARGETS:%=$(BUILDDIR)/%)
-ASM_DEP_FILES    := $(ASM_SOURCE_FILES:%=$(DEPDIR)/%.d)
-DEP_FILES         = $(CPP_DEP_FILES) $(ASM_DEP_FILES)
-TARGETS           = $(CPP_TARGETS) $(ASM_TARGETS)
-TARGET_DEPS      := $(TARGETS:$(BUILDDIR)/%=$(DEPDIR)/%_tgt.d)
+CPP_OBJ_FILES     := $(CPP_SOURCE_FILES:%.cpp=$(BUILDDIR)/%.o)
+CPP_DEP_FILES     := $(CPP_SOURCE_FILES:%=$(DEPDIR)/%.d)
+CPP_SOURCE_FILES  := $(CPP_SOURCE_FILES:%$(CPP_SOURCE_EXT)=$(SRCDIR)/%$(CPP_SOURCE_EXT))
+CPP_TARGETS       := $(CPP_TARGETS:%=$(BUILDDIR)/%)
+ASM_TARGETS       := $(ASM_TARGETS:%=$(BUILDDIR)/%)
+ASM_DEP_FILES     := $(ASM_SOURCE_FILES:%=$(DEPDIR)/%.d)
+DEP_FILES          = $(CPP_DEP_FILES) $(ASM_DEP_FILES)
+TARGETS            = $(CPP_TARGETS) $(ASM_TARGETS)
+GENERATED_TARGETS := $(GENERATED_TARGETS:%=$(BUILDDIR)/%)
+CPP_TARGET_DEPS   := $(CPP_TARGETS:$(BUILDDIR)/%=$(DEPDIR)/%_cpp_tgt.d)
+ASM_TARGET_DEPS   := $(ASM_TARGETS:$(BUILDDIR)/%=$(DEPDIR)/%_asm_tgt.d)
+TARGET_DEPS       := $(CPP_TARGET_DEPS) $(ASM_TARGET_DEPS)
 # Also here, ASM_TARGETS is special
-ASM_TARGETS      := $(ASM_TARGETS:%=%.bin)
+ASM_TARGETS       := $(ASM_TARGETS:%=%.bin)
 
 $(shell mkdir -p $(BUILDDIR))
 $(shell mkdir -p $(DEPDIR))
@@ -49,8 +52,9 @@ ifneq ($(strip $(SUBDIRS)),)
 	$(shell cd $(BUILDDIR) && mkdir -p $(SUBDIRS))
 	$(shell cd $(DEPDIR) && mkdir -p $(SUBDIRS))
 endif
-ASMFLAGS = -I $(SRCDIR)
-CFLAGS   = -pipe -I$(SRCDIR) -std=c++17 -pedantic -Wall -Wextra -Werror -Wfatal-errors -Wno-unused-function
+INCLUDE_DIRS = -I $(SRCDIR) -I $(BUILDDIR)
+ASMFLAGS = $(INCLUDE_DIRS)
+CFLAGS   = -pipe $(INCLUDE_DIRS) -std=c++17 -pedantic -Wall -Wextra -Werror -Wfatal-errors -Wno-unused-function
 LDFLAGS  = -lboost_signals -lboost_filesystem -lboost_system -lboost_thread -lboost_chrono
 DBGFLAGS = -O0 -g
 
@@ -67,7 +71,7 @@ all: $(TARGET_DEPS) $(TARGETS)
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)   Build complete"
 
 # http://sunsite.ualberta.ca/Documentation/Gnu/make-3.79/html_chapter/make_4.html
-$(DEPDIR)/%$(ASM_SOURCE_EXT).d: $(SRCDIR)/%$(ASM_SOURCE_EXT)
+$(DEPDIR)/%$(ASM_SOURCE_EXT).d: $(SRCDIR)/%$(ASM_SOURCE_EXT) $(GENERATED_TARGETS)
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)   Scanning preprocess-time dependencies for $<"
 	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.pp_asm $@"
 # Next line might not be needed and lead to excessively long lines:
@@ -78,7 +82,7 @@ $(DEPDIR)/%$(ASM_SOURCE_EXT).d: $(SRCDIR)/%$(ASM_SOURCE_EXT)
 	@rm -f $@_
 
 # http://sunsite.ualberta.ca/Documentation/Gnu/make-3.79/html_chapter/make_4.html
-$(DEPDIR)/%$(CPP_SOURCE_EXT).d: $(SRCDIR)/%$(CPP_SOURCE_EXT)
+$(DEPDIR)/%$(CPP_SOURCE_EXT).d: $(SRCDIR)/%$(CPP_SOURCE_EXT) $(GENERATED_TARGETS)
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)   Scanning compile-time dependencies for $<"
 	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.o $@"
 # Next line might not be needed and lead to excessively long lines:
@@ -149,17 +153,15 @@ $(DEPDIR)/%$(CPP_SOURCE_EXT).d: $(SRCDIR)/%$(CPP_SOURCE_EXT)
 	@echo "$(COLOR_CYAN)[ disasm    ]$(COLOR_RESET)   Disassembling $<..."
 	@avr-objdump -zD --prefix-address --show-raw-insn --insn-width 4 -b binary -m avr $< > $@
 
-$(DEPDIR)/%_tgt.d: $(DEPDIR)/%$(ASM_SOURCE_EXT).d
+$(DEPDIR)/%_asm_tgt.d: $(DEPDIR)/%$(ASM_SOURCE_EXT).d
 # Nothing to do here, the preprocessing step is basically like linking?
-	@touch $(DEPDIR)/%$(ASM_SOURCE_EXT).d
+	@touch $@
 
 ################################################################################
 
 
-$(DEPDIR)/%_tgt.d: $(DEPDIR)/%$(CPP_SOURCE_EXT).d
+$(DEPDIR)/%_cpp_tgt.d: $(DEPDIR)/%$(CPP_SOURCE_EXT).d
 	@echo "$(COLOR_CYAN)[ linking   ]$(COLOR_RESET)   Scanning link-time dependencies for $*"
-#	     For all deps,         back-ref .o to the source files,             back-ref header files to source filess,               put on new lines,              if exists,        output,               sort && rename back to output .o,                                     put back on one line,     make these .o files dependencies of the final output.
-#	@sed "$(DEPDIR)/$*.d" -Ee 's~(^[^.]+)\.o:~src/\1$(CPP_SOURCE_EXT)~' -e 's~( [^.]+)$(CPP_ASM_HEADER_EXT)~\1$(CPP_SOURCE_EXT)~g' -e 's: :\n:g' | while read l ; do [ -f "$${l}" ] && echo "$${l}" ; done | sort -u | sed -Ee 's:^(src/)([^.]+)($(CPP_SOURCE_EXT)):build/\2.o:' | sed ':a;N;s:\n: :g;ta' | (echo -n "$*: " ; cat) > $@
 #	     For all deps,        back-ref .o to the source files,                   back-ref dependent files to source files,  put on new lines,                 if exists,      output,               sort && rename back to output .o,                                                 put back on one line,     make these .o files dependencies of the final output.
 	@sed "$(DEPDIR)/$*$(CPP_SOURCE_EXT).d" -Ee 's~(^[^.]+)\.o:~$(SRCDIR)/\1$(CPP_SOURCE_EXT)~' -e 's~( [^.]+)[^ ]+~\1$(CPP_SOURCE_EXT)~g' -e 's: +:\n:g' | while read l ; do [ -f "$${l}" ] && echo "$${l}" ; done | sort -u | sed -Ee 's:^($(SRCDIR)/)([^.]+)($(CPP_SOURCE_EXT)):$(BUILDDIR)/\2.o:' | sed ':a;N;s:\n: :g;ta' | (echo -n "$(BUILDDIR)/$*: " ; cat) > $@
 
@@ -171,6 +173,7 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%$(CPP_SOURCE_EXT)
 %:
 	@echo '$(COLOR_CYAN)[ linking   ]$(COLOR_RESET)   $@'
 	@$(CXX) $(LDFLAGS) $^ -o $@
+
 
 ################################################################################
 
