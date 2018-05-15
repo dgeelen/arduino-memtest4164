@@ -13,6 +13,8 @@ CPP_HEADER_EXT  = .hpp
 ##  These are the files to build  ##
 ####################################
 ASM_TARGETS := memtest4164
+CPP_TARGETS := fontgen
+GENERATED_TARGETS := fontdef.inc
 
                          ############################
 ###########################  Don't touch anything  ############################
@@ -177,6 +179,19 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%$(CPP_SOURCE_EXT)
 
 ################################################################################
 
+
+# I can't figure out how to get make to first scan for dependencies before
+# running remaining rules. I want to say that e.g. $(SRCDIR)/ssd1396.csm
+# (and by extension $(DEPDIR)/ssd1396.csm.d) depend on $(BUILDDIR)/fontdef.inc,
+# but this always causes make to immediately try to build fontgen, eventhough
+# it will later discover that fontgen may have more dependencies...
+$(BUILDDIR)/fontgen: $(BUILDDIR)/fontgen.o $(BUILDDIR)/font.o
+
+$(BUILDDIR)/fontdef.inc: $(BUILDDIR)/fontgen $(SRCDIR)/font.png
+	@echo "$(COLOR_CYAN)[ preproces ]$(COLOR_RESET)   Generating $@"
+	@$< $(SRCDIR)/font.png > $@
+
+################################################################################
 
 
 .PHONY: disassembly
