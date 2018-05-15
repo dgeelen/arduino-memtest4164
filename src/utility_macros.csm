@@ -741,5 +741,8 @@ III_ISEMPTY(                                                               \
 /**
  * When working with the flash, all addresses need to be multiplied by two,
  * because the flash is only word addressable.
+ * I.e. when requesting the address of a label in flash, you get the word
+ * address. But if you want to access flash using e.g. lpm, you need a byte
+ * address.
  */
 #define FLASH_ADDR(x) (2*(x))
