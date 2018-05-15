@@ -179,6 +179,7 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%$(CPP_SOURCE_EXT)
 
 
 
+.PHONY: disassembly
 disassembly: $(ASM_TARGETS:.bin=.asm)
 
 # Simulation will generate a .VCD file
