@@ -54,14 +54,14 @@ ifneq ($(strip $(SUBDIRS)),)
 endif
 INCLUDE_DIRS = -I $(SRCDIR) -I $(BUILDDIR)
 ASMFLAGS = $(INCLUDE_DIRS)
-CFLAGS   = -pipe $(INCLUDE_DIRS) -std=c++17 -pedantic -Wall -Wextra -Werror -Wfatal-errors -Wno-unused-function
-LDFLAGS  = -lboost_signals -lboost_filesystem -lboost_system -lboost_thread -lboost_chrono
-DBGFLAGS = -O0 -g
-
+CFLAGS   = -pipe $(INCLUDE_DIRS) -pedantic -Wall -Wextra -Werror -Wfatal-errors -Wno-unused-function
 ifneq ($(DEBUG),0)
 $(info $(COLOR_GREEN)[Debug mode]$(COLOR_RESET))
 	CFLAGS+=$(DBGFLAGS)
 endif
+CXXFLAGS = $(CFLAGS) -std=c++17
+LDFLAGS  = -lpng
+DBGFLAGS = -O0 -g
 
 #.SILENT:
 
@@ -73,7 +73,7 @@ all: $(TARGET_DEPS) $(TARGETS)
 # http://sunsite.ualberta.ca/Documentation/Gnu/make-3.79/html_chapter/make_4.html
 $(DEPDIR)/%$(ASM_SOURCE_EXT).d: $(SRCDIR)/%$(ASM_SOURCE_EXT) $(GENERATED_TARGETS)
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)   Scanning preprocess-time dependencies for $<"
-	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.pp_asm $@"
+	@$(CXX) $(CXXFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.pp_asm $@"
 # Next line might not be needed and lead to excessively long lines:
 	@sed -Ee 's: *$$::' -e ':\\$$:;N;s:\\\n: :' -e 's: +: :g' -i $@
 # next line from http://make.paulandlesley.org/autodep.html
@@ -84,7 +84,7 @@ $(DEPDIR)/%$(ASM_SOURCE_EXT).d: $(SRCDIR)/%$(ASM_SOURCE_EXT) $(GENERATED_TARGETS
 # http://sunsite.ualberta.ca/Documentation/Gnu/make-3.79/html_chapter/make_4.html
 $(DEPDIR)/%$(CPP_SOURCE_EXT).d: $(SRCDIR)/%$(CPP_SOURCE_EXT) $(GENERATED_TARGETS)
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)   Scanning compile-time dependencies for $<"
-	@$(CXX) $(CFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.o $@"
+	@$(CXX) $(CXXFLAGS) -x c++ -MM $< -MF $@ -MT "$(BUILDDIR)/$*.o $@"
 # Next line might not be needed and lead to excessively long lines:
 	@sed -Ee 's: *$$::' -e ':\\$$:;N;s:\\\n: :' -e 's: +: :g' -i $@
 # next line from http://make.paulandlesley.org/autodep.html
@@ -101,7 +101,7 @@ $(DEPDIR)/%$(CPP_SOURCE_EXT).d: $(SRCDIR)/%$(CPP_SOURCE_EXT) $(GENERATED_TARGETS
 # list) is automatically selected.
 %.pp_asm:
 	@echo "$(COLOR_CYAN)[ compiling ]$(COLOR_RESET)   Preprocessing $< / $@"
-	@$(CXX) $(CFLAGS) -x c++ -std=c++17 -E -o $@ $<
+	@$(CXX) $(CXXFLAGS) -x c++ -E -o $@ $<
 # AVR assembler should support '$' as logical line-end, but AVRA does not
 	@sed -i "s:\\$$:\n:g" $@
 # remove comments (lines starting with #)
