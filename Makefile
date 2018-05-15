@@ -58,12 +58,12 @@ INCLUDE_DIRS = -I $(SRCDIR) -I $(BUILDDIR)
 ASMFLAGS = $(INCLUDE_DIRS)
 CFLAGS   = -pipe $(INCLUDE_DIRS) -pedantic -Wall -Wextra -Werror -Wfatal-errors -Wno-unused-function
 ifneq ($(DEBUG),0)
+DBGFLAGS = -O0 -g
 $(info $(COLOR_GREEN)[Debug mode]$(COLOR_RESET))
 	CFLAGS+=$(DBGFLAGS)
 endif
 CXXFLAGS = $(CFLAGS) -std=c++17
 LDFLAGS  = -lpng
-DBGFLAGS = -O0 -g
 
 #.SILENT:
 
