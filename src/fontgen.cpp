@@ -11,29 +11,24 @@
 
 
 struct DBTable {
-	DBTable(const std::string& label, const std::string& comment)
-	: label  {label  }
-	, comment{comment}
-	{}
 	std::size_t storage_size() const {
 		return data.size() + data.size()%2; // +padding
 	}
-	const std::string label;
-	const std::string comment;
-	std::vector<std::uint8_t> data;
+	std::vector<std::string> data;
 };
 
 std::ostream& operator<<(std::ostream& stream, const DBTable& dbt) {
-	stream << "; " << dbt.comment << "\n"
-	       << dbt.label << ":\n";
+	std::size_t line_len = 0;
 	for(std::size_t i = 0; i < dbt.data.size(); ++i) {
-		if(i % 8 == 0) {
+		if(i % 8 == 0 || line_len > 79) {
 			if(i) {
 				stream << " ; " << to_hex<std::uint16_t>(i) << "\n";
 			}
 			stream << ".db ";
+		line_len = 4;
 		}
-		stream << to_hex(dbt.data[i]) << (i+1 == dbt.data.size() ? "" : ", ");
+		stream << dbt.data[i] << (i+1 == dbt.data.size() ? "" : ", ");
+		line_len += dbt.data[i].size() + (i+1 == dbt.data.size() ? 0 : 2);
 	}
 	if(dbt.data.size() % 8 != 0 && dbt.data.size() % 2 != 0) {
 		stream << ", 0x00";
@@ -101,15 +96,15 @@ int main(const int argc, const char* argv[]) try {
 		std::size_t glyph_width;
 		std::string name;
 		std::vector<Glyph> glyphs;
+		DBTable glyph_data;
 		bool operator==(const GlyphTable& that) const {
 			return this->glyph_width == that.glyph_width &&
 			       this->name        == that.name &&
 			       this->glyphs      == that.glyphs;
 		}
 	};
-	std::vector<std::unique_ptr<GlyphTable>> tables;
+	std::vector<std::unique_ptr<GlyphTable>> glyph_tables;
 	std::map<Glyph, const GlyphTable*> glyph_table_map;
-	bytes_used.emplace_back("Glyph data", 0);
 	for(const auto& i : size_map) {
 		if(std::all_of(i.second.begin(), i.second.end(), [](const auto& s) { return s.empty(); })) {
 			continue;
@@ -120,14 +115,14 @@ int main(const int argc, const char* argv[]) try {
 		        << " (" << i.second.size() << "x)";
 		std::stringstream label;
 		label << "__ssd1306_font_glyphs_" << width << "px";
-		DBTable dbt(label.str(), comment.str());
 
-		tables.emplace_back(std::make_unique<GlyphTable>(label.str(), width));
-		if(tables.size() == 1) {
+		glyph_tables.emplace_back(std::make_unique<GlyphTable>(label.str(), width));
+		DBTable& dbt = glyph_tables.back()->glyph_data;
+		if(glyph_tables.size() == 1) {
 			// Special case: the first entry of table 0 will always map to space,
 			// with space being as large as the smallest character.
 			for(std::size_t i = 0; i < width; ++i) {
-				dbt.data.push_back(0); // no pixel data
+				dbt.data.push_back("0x00"); // no pixel data
 			}
 			auto space = std::find_if(fnt.glyphs().begin(), fnt.glyphs().end(), [](const auto& g) {
 				return g.character() == ' ';
@@ -135,8 +130,8 @@ int main(const int argc, const char* argv[]) try {
 			if(space == fnt.glyphs().end()) {
 				throw std::runtime_error("Space character has no glyph?!");
 			}
-			glyph_table_map[*space] = tables.back().get();
-			tables.back()->glyphs.push_back(*space);
+			glyph_table_map[*space] = glyph_tables.back().get();
+			glyph_tables.back()->glyphs.push_back(*space);
 		}
 		std::vector<std::uint8_t> table;
 		for(auto s = i.second.begin(); s != i.second.end(); ++s) {
@@ -144,68 +139,58 @@ int main(const int argc, const char* argv[]) try {
 			for(std::size_t col = s->box().left(); col < s->box().right() + 1; ++col) {
 				const std::uint8_t c = s->column(col);
 				assert(!(col == s->box().left() || col == s->box().right()) || c != 0);
-				dbt.data.push_back(c);
+				dbt.data.push_back(to_hex(c));
+				if(s->character() == 'A') {
+					std::cerr << "A:" << col << " = " << to_hex(c) << "\n";
+				}
+				//std::cout << '\t' << s.printable_character() << ": " << s.box() << "\n";
+				//break;
 			}
-			glyph_table_map[*s] = tables.back().get();
-			tables.back()->glyphs.push_back(*s);
+			glyph_table_map[*s] = glyph_tables.back().get();
+			glyph_tables.back()->glyphs.push_back(*s);
 		}
-		std::cout << dbt;
-		bytes_used.back().second += dbt.storage_size();
-		std::cout << "\n";
 	}
 
-	// We need a table to map table entries to table pointers
-	// By making sure that the index into the table here is the same as the width
-	// of the character, we save having to have another table for storing widths,
-	// and make the code below a (little) bit easier.
+	// This will hold all the tables, in the end
+	DBTable font_data;
+
+	/***************************************************************************
+	 ** Make sure that we can later map glyph-widths to the a table           **
+	 ***************************************************************************/
+	// We need a table to map table entries to table pointers. By making sure
+	// that the index into a table is the same as the width of the character,
+	// we save having to have another table for storing widths, and make the
+	// avr code a (little) bit easier. To do this we ensure that all widths
+	// 0..max_width have a table.
 	const std::size_t widest_glyph = (*std::max_element(
-		tables.begin(),
-		tables.end(),
+		glyph_tables.begin(),
+		glyph_tables.end(),
 		[](const auto& lhs, const auto& rhs) {
 			return lhs->glyph_width < rhs->glyph_width;
 		}
 	))->glyph_width;
 	for(std::size_t i = 0; i < widest_glyph + 1; ++i) {
 		const auto table = std::find_if(
-			tables.begin(),
-			tables.end(),
+			glyph_tables.begin(),
+			glyph_tables.end(),
 			[=](const auto& e) {
 				return e->glyph_width == i;
 			}
 		);
-		if(table == tables.end()) {
-			tables.emplace_back(std::make_unique<GlyphTable>("__ssd1306_font_glyphs_" + std::to_string(i) + "px", 0));
+		if(table == glyph_tables.end()) {
+			glyph_tables.emplace_back(std::make_unique<GlyphTable>("__ssd1306_font_glyphs_" + std::to_string(i) + "px", 0));
 		}
 	}
 
-	std::sort(tables.begin(), tables.end(), [](const auto& lhs, const auto& rhs){
+	// Make sure tables are sorted according to glyph width
+	std::sort(glyph_tables.begin(), glyph_tables.end(), [](const auto& lhs, const auto& rhs){
 		return lhs->glyph_width < rhs->glyph_width;
 	});
 
-	std::cout << "__ssd1306_font_glyph_tables:\n";
-	for(const auto& table : tables) {
-		if(table->glyph_width != 0) {
-			std::cout << ".db low(FLASH_ADDR(" << table->name << ")), high(FLASH_ADDR(" << table->name << "))\n";
-		}
-		else {
-			std::cout << ".db 0, 0 ; no " << table->glyph_width << "px wide glyphs\n";
-		}
-	}
-	std::cout << "\n";
-	bytes_used.emplace_back("Glyph-width to table mapping", 2 * tables.size());
 
-
-	const std::size_t n_table_bits = std::ceil(std::log2(tables.size()));
-	const std::size_t n_index_bits = std::ceil(std::log2(
-		(*std::max_element(tables.begin(), tables.end(), [](const auto& lhs, const auto& rhs) {
-			return lhs->glyphs.size() < rhs->glyphs.size();
-		}))->glyphs.size()
-	));
-	if(n_table_bits > 8 || n_index_bits > 8) {
-		throw std::runtime_error("this many bits should not be needed for indexing!");
-	}
-
-
+	/***************************************************************************
+	 ** ??                                                            **
+	 ***************************************************************************/
 	// fill out the glyph table with missing characters, mapping them to space
 	// (or to '.' or '?')
 	std::uint8_t first_glyph = std::min_element(
@@ -228,16 +213,29 @@ int main(const int argc, const char* argv[]) try {
 	if(space == fnt.glyphs().end()) {
 		throw std::runtime_error("Space character has no glyph?!");
 	}
-	auto space_table = std::find_if(tables.begin(), tables.end(), [&](const auto& table) {
+	auto space_table = std::find_if(glyph_tables.begin(), glyph_tables.end(), [&](const auto& table) {
 		return std::find(table->glyphs.begin(), table->glyphs.end(), *space) != table->glyphs.end();
 	});
-	assert(space_table != tables.end());
+	assert(space_table != glyph_tables.end());
 	for(char i = first_glyph; i < last_glyph; ++i) {
 		if(std::find_if(glyph_table_map.begin(), glyph_table_map.end(), [=](const auto& g) {
 			return g.first.character() == i;
 		}) == glyph_table_map.end()) {
 			glyph_table_map[*space] = space_table->get();
 		}
+	}
+
+	/***************************************************************************
+	 ** Determine number of bits needed to represent tables and indices       **
+	 ***************************************************************************/
+	const std::size_t n_table_bits = std::ceil(std::log2(glyph_tables.size()));
+	const std::size_t n_index_bits = std::ceil(std::log2(
+		(*std::max_element(glyph_tables.begin(), glyph_tables.end(), [](const auto& lhs, const auto& rhs) {
+			return lhs->glyphs.size() < rhs->glyphs.size();
+		}))->glyphs.size()
+	));
+	if(n_table_bits > 8 || n_index_bits > 8) {
+		throw std::runtime_error("this many bits should not be needed for indexing!");
 	}
 
 	std::cout << "\n\n"
@@ -250,6 +248,31 @@ int main(const int argc, const char* argv[]) try {
 	          << "\n"
 	          ;
 
+	/***************************************************************************
+	 ** Map glyph-widths to the corresponding table                           **
+	 ***************************************************************************/
+	DBTable glyph_width_table;
+	assert(font_data.data.size() == 0);
+	std::size_t table_start_offset = glyph_tables.size()*2 +
+	                                 std::ceil(((last_glyph-first_glyph+1)*(n_table_bits+n_index_bits))/8);
+	for(const auto& table : glyph_tables) {
+		if(table->glyph_width != 0) {
+			glyph_width_table.data.push_back("low(FLASH_ADDR(__ssd1306_font_data) + " + to_hex<std::uint16_t>(table_start_offset) + ")");
+			glyph_width_table.data.push_back("high(FLASH_ADDR(__ssd1306_font_data) + " + to_hex<std::uint16_t>(table_start_offset) + ")");
+			std::cout << "; offset glyph width table " << table->glyph_width << "px: " << to_hex(table_start_offset) << "\n";
+			table_start_offset += table->glyph_data.data.size();
+		}
+		else {
+			glyph_width_table.data.push_back("0x00");
+			glyph_width_table.data.push_back("0x00");
+		}
+	}
+	font_data.data.insert(font_data.data.end(), glyph_width_table.data.begin(), glyph_width_table.data.end());
+	bytes_used.emplace_back("Glyph-width to table mapping", glyph_width_table.data.size());
+
+	/***************************************************************************
+	 ** Map ascii characters to glyph (table and index-in-table)              **
+	 ***************************************************************************/
 	std::map<char, Glyph> ascii_order_glyph_map;
 	for(std::uint8_t ascii = first_glyph; ascii < last_glyph; ++ascii) {
 		auto glyph = std::find_if(fnt.glyphs().begin(), fnt.glyphs().end(), [=](const auto& glyph) {
@@ -262,12 +285,12 @@ int main(const int argc, const char* argv[]) try {
 
 	std::uint32_t packed{};
 	std::size_t bits_in_pack{};
-	DBTable index_table("__ssd1306_font_char_index_table", "map of character to glyph table/index pair");
+	DBTable index_table;
 	for(const auto e : ascii_order_glyph_map) {
 		const GlyphTable* table = glyph_table_map[e.second];
 		const std::size_t nth_table = std::distance(
-			tables.begin(),
-			std::find_if(tables.begin(), tables.end(), [=](const auto& t) {
+			glyph_tables.begin(),
+			std::find_if(glyph_tables.begin(), glyph_tables.end(), [=](const auto& t) {
 				return table == t.get();
 			})
 		);
@@ -284,7 +307,7 @@ int main(const int argc, const char* argv[]) try {
 			std::cerr << "index table: A = " << to_hex<std::uint8_t>(nth_table) << "." << to_hex<std::uint8_t>(index) << "\n";
 		}
 		while(bits_in_pack >= 8) {
-			index_table.data.push_back(packed>>(bits_in_pack-8));
+			index_table.data.push_back(to_hex<std::uint8_t>(packed>>(bits_in_pack-8)));
 			bits_in_pack -= 8;
 		}
 	}
@@ -295,21 +318,44 @@ int main(const int argc, const char* argv[]) try {
 			++bits_in_pack;
 		}
 		else {
-			index_table.data.push_back(packed>>(bits_in_pack-8));
+			index_table.data.push_back(to_hex<std::uint8_t>(packed>>(bits_in_pack-8)));
 			bits_in_pack -= 8;
 		}
 	}
 	assert(bits_in_pack == 0);
-	std::cout << index_table;
-	bytes_used.emplace_back("Character to glyph table/index mapping", index_table.storage_size());
+	font_data.data.insert(font_data.data.end(), index_table.data.begin(), index_table.data.end());
+	bytes_used.emplace_back("Character to glyph table/index mapping", index_table.data.size());
+	std::size_t ascii_order_glyph_map_offset = glyph_tables.size()*2;
+	std::cout << "#define __ssd1306_font_ascii_order_glyph_map_offset (" << to_hex(ascii_order_glyph_map_offset) << ")\n";
 
+
+	/***************************************************************************
+	 ** Glyph data                                                            **
+	 ***************************************************************************/
+	bytes_used.emplace_back("Glyph data", 0);
+	for(const auto& table : glyph_tables) {
+		font_data.data.insert(font_data.data.end(), table->glyph_data.data.begin(), table->glyph_data.data.end());
+		bytes_used.back().second += table->glyph_data.data.size();
+	}
+	bytes_used.back().second += font_data.data.size() % 2;
+
+	/***************************************************************************
+	 ** Output font data table                                                **
+	 ***************************************************************************/
+	std::cout << "__ssd1306_font_data:\n" << font_data << "\n";
+
+
+
+	/***************************************************************************
+	 ** Code                                                                  **
+	 ***************************************************************************/
 	std::cout << "\n\n"
 	          << "; returns (in z) the address (in flash) of the first data byte" "\n"
 	          << "; of the requested character (r16), and the size (width) of"    "\n"
 	          << "; the character in r25."                                        "\n"
 	          << "__ssd1306_font_get_data_ptr:"                                   "\n"
-	          << "\tldi    zl, low(FLASH_ADDR(__ssd1306_font_char_index_table))"  "\n"
-	          << "\tldi    zh, high(FLASH_ADDR(__ssd1306_font_char_index_table))" "\n"
+	          << "\tldi    zl, low(FLASH_ADDR(__ssd1306_font_data)+__ssd1306_font_ascii_order_glyph_map_offset)"  "\n"
+	          << "\tldi    zh, high(FLASH_ADDR(__ssd1306_font_data)+__ssd1306_font_ascii_order_glyph_map_offset)" "\n"
 	          << "\t"                                                             "\n"
 	          << "\t; first of all, see if the requested character has a glyph"   "\n"
 	          << "\tsubi   r16, __ssd1306_font_first_glyph"                       "\n"
@@ -407,8 +453,8 @@ int main(const int argc, const char* argv[]) try {
 	          << "\t;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;" "\n"
 	          << "\t; step 3: convert table and index into pointer"               "\n"
 	          << "\t;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;" "\n"
-	          << "\tldi    zl, low(FLASH_ADDR(__ssd1306_font_glyph_tables))"      "\n"
-	          << "\tldi    zh, high(FLASH_ADDR(__ssd1306_font_glyph_tables))"     "\n"
+	          << "\tldi    zl, low(FLASH_ADDR(__ssd1306_font_data))"              "\n"
+	          << "\tldi    zh, high(FLASH_ADDR(__ssd1306_font_data))"             "\n"
 	          << "\tadd    zl, xl"                                                "\n"
 	          << "\tadc    zh, r00"                                               "\n"
 	          << "\tadd    zl, xl"                                                "\n"
@@ -436,18 +482,15 @@ int main(const int argc, const char* argv[]) try {
 	          << "\tret"                                                          "\n"
 	          ;
 
+
 	const std::size_t n_glyphs = std::accumulate(fnt.glyphs().begin(), fnt.glyphs().end(), 0, [](const std::size_t a, const auto& g) { return a + !g.empty(); });
 	std::cout << "\n\n"
 	          << "; Number of glyphs: "   << n_glyphs << '\n';
-	std::size_t total_bytes_used{};
+	bytes_used.emplace_back("Total storage used", font_data.storage_size());
 	for(const auto& e : bytes_used) {
 		std::cout << "; " << e.first << ": " << e.second
 		          << " bytes (~" << std::setprecision(3) << (e.second / double(n_glyphs)) << " bytes/glyph)\n";
-		total_bytes_used += e.second;
 	}
-	std::cout << "; Total storage used: " << total_bytes_used
-	          << " bytes (~" << std::setprecision(3) << (total_bytes_used / double(n_glyphs)) << " bytes/glyph)\n"
-	          ;
 
 	return 0 ;
 }
