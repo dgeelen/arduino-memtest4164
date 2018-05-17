@@ -40,6 +40,7 @@
  ******************************************************************************/
 #pragma once
 
+#include "abi.csm"
 #include "utility_macros.csm"
 #include "string_constant.csm"
 #include "interrupts.csm"
@@ -75,7 +76,7 @@ DEF_LABELED(_serial_init,                                                       
 	ldi   zh, high(__serial_tx_len)                                               $\
 	ldi   r25, __serial_rx_var_end - __serial_rx_var_begin + 1                    $\
 	__serial_initialise_variables:                                                $\
-	sts   __serial_tx_len, r00                                                    $\
+	sts   __serial_tx_len, rC0                                                    $\
 	dec   r25                                                                     $\
 	brne  __serial_initialise_variables                                           $\
 	restore_registers(zl, zh)                                                     $\
@@ -310,14 +311,14 @@ DEF_LABELED(serial_flush,                                                       
 ; r16: buffer length
 ;   z: buffer
 DEF_LABELED(serial_write_ram,                                                   $\
-	sts   __serial_tx_lpm, r00                                                    $\
+	sts   __serial_tx_lpm, rC0                                                    $\
 	rjmp  __serial_write                                                          $\
 )
 
 ; r16: buffer length
 ;   z: buffer
 DEF_LABELED(serial_write_rom,                                                   $\
-	sts   __serial_tx_lpm, r01                                                    $\
+	sts   __serial_tx_lpm, rC1                                                    $\
 	; fallthrough to __serial_write                                               $\
 )
 
@@ -326,7 +327,7 @@ DEF_LABELED(serial_write_rom,                                                   
 ;   z: buffer
 DEF_LABELED(__serial_write,                                                     $\
 	sts   __serial_tx_len, r16                                                    $\
-	sts   __serial_tx_pos, r00                                                    $\
+	sts   __serial_tx_pos, rC0                                                    $\
 	sts   __serial_tx_buf_ptr+1, zl                                               $\
 	sts   __serial_tx_buf_ptr+0, zh                                               $\
 	; Rather than repeating the whole load byte/write to UDR dance, simply        $\
@@ -335,7 +336,7 @@ DEF_LABELED(__serial_write,                                                     
 	; (in order to trigger the interrupt).                                        $\
 	rjmp  __serial_udri_enable                                                    $\
 __serial_ret_with_error:                                                        $\
-	mov  r25, r01                                                                 $\
+	mov  r25, rC1                                                                 $\
 	ret                                                                           $\
 )
 
@@ -347,7 +348,7 @@ __serial_ret_with_error:                                                        
 DEF_LABELED(serial_async_read,                                                  $\
 	cli   ; Atomic                                                                $\
 	sts   __serial_rx_len, r16                                                    $\
-	sts   __serial_rx_pos, r00                                                    $\
+	sts   __serial_rx_pos, rC0                                                    $\
 	sts   __serial_rx_buf_ptr+1, zl                                               $\
 	sts   __serial_rx_buf_ptr+0, zh                                               $\
 	sei                                                                           $\
@@ -395,7 +396,7 @@ ISR_HANDLER(serial_interrupt_handler_data_empty,                                
 	lds   zl, __serial_tx_buf_ptr+1                                               $\
 	lds   zh, __serial_tx_buf_ptr+0                                               $\
 	add   zl, r25                                                                 $\
-	adc   zh, r00                                                                 $\
+	adc   zh, rC0                                                                 $\
 	inc   r25                                                                     $\
 	sts   __serial_tx_pos, r25                                                    $\
 	                                                                              $\
@@ -442,7 +443,7 @@ ISR_HANDLER(serial_interrupt_handler_rx,                                        
 	lds   zl, __serial_rx_buf_ptr+1                                               $\
 	lds   zh, __serial_rx_buf_ptr+0                                               $\
 	add   zl, r24                                                                 $\
-	adc   zh, r00                                                                 $\
+	adc   zh, rC0                                                                 $\
 	                                                                              $\
 	; store byte to buffer                                                        $\
 	st    z, r25                                                                  $\

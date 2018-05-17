@@ -20,6 +20,7 @@
 
  ******************************************************************************/
 #pragma once
+#include "abi.csm"
 #include "utility_macros.csm"
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/preprocessor/seq/cat.hpp>
@@ -56,7 +57,7 @@ DEF_LABELED(_is_ram_addr,                                                       
 	; if z < RAMEND it is either RAM or IO,                                       $\
 	; but we consider both as RAM                                                 $\
 	clr   r25                                                                     $\
-	adc   r25, r00                                                                $\
+	adc   r25, rC0                                                                $\
 	ret                                                                           $\
 )
 #define is_ram_addr(x)                                                           \
@@ -86,7 +87,7 @@ DEF_LABELED(_is_rom_addr,                                                       
 	cpc   r25, zh           ; if(RAMEND < z) C=1 else C=0                         $\
 __is_rom_addr:                                                                  $\
 	clr   r25                                                                     $\
-	adc   r25, r00                                                                $\
+	adc   r25, rC0                                                                $\
 	ret                                                                           $\
 )
 #define is_rom_addr(x)                                                           \
@@ -122,15 +123,15 @@ DEF_LABELED(_strlen,                                                            
 	clr    r25                                                                    $\
 __strlen_next_char:                                                             $\
 	ld     r24, z                                                                 $\
-	cpse   r23, r01                                                               $\
+	cpse   r23, rC1                                                               $\
 	lpm    r24, z                                                                 $\
 	adiw   zl, 1                                                                  $\
-	add    r25, r01                                                               $\
-	cpse   r24, r00                                                               $\
+	add    r25, rC1                                                               $\
+	cpse   r24, rC0                                                               $\
 	rjmp   __strlen_next_char                                                     $\
 	sub    zl, r25                                                                $\
-	sbc    zh, r00                                                                $\
-	sub    r25, r01                                                               $\
+	sbc    zh, rC0                                                                $\
+	sub    r25, rC1                                                               $\
 	restore_registers(r23)                                                        $\
 	ret                                                                           $\
 )
@@ -185,7 +186,7 @@ DEF_LABELED(_printf,                                                            
 	add    r25, r24                                                               $\
 	sts    __printf_arg_ptr+1, r25                                                $\
 	in     r25, SPH                                                               $\
-	adc    r25, r00                                                               $\
+	adc    r25, rC0                                                               $\
 	sts    __printf_arg_ptr+0, r25                                                $\
 	                                                                              $\
 	save_registers(                                                                \
@@ -231,7 +232,7 @@ __printf_next_char:                                                             
 	                                                                              $\
 __printf_start:                                                                 $\
 	ld     r25, z                                                                 $\
-	cpse   r08, r01                                                               $\
+	cpse   r08, rC1                                                               $\
 	lpm    r25, z                                                                 $\
 	                                                                              $\
 	; see if it is eol                                                            $\
@@ -247,11 +248,11 @@ __printf_start:                                                                 
 	                                                                              $\
 	; it is the conversion specifier introductory character,                      $\
 	; output current buffer and switch to conversion specifier mode               $\
-	cpse   r16, r00                                                               $\
+	cpse   r16, rC0                                                               $\
 	rcall  __printf_serial_write                                                  $\
 	ori    r23, __printf_conversion_specifier_mask                                $\
 	movw   xl, zl   ; remember start position (xl points at '%')                  $\
-	mov    r16, r00 ; updated in __printf_next_char                               $\
+	mov    r16, rC0 ; updated in __printf_next_char                               $\
 	rjmp   __printf_next_char                                                     $\
 	                                                                              $\
 	; currently _in_ a conversion specifier                                       $\
@@ -275,7 +276,7 @@ __printf_length_modifier_h:                                                     
 	rjmp   __printf_length_modifier_l                                             $\
 	mov    r25, r22                                                               $\
 	andi   r25, __printf_argument_length_mask                                     $\
-	cp     r25, r00                                                               $\
+	cp     r25, rC0                                                               $\
 	breq   __printf_conversion_specifier_error                                    $\
 	dec    r25                                                                    $\
 	andi   r22, BITINV(__printf_argument_length_mask)                             $\
@@ -333,15 +334,15 @@ __printf_conversion_format_specifier_no_match:                                  
 
 DEF_LABELED(; exit points,                                                      $\
 __printf_ret_error:                                                             $\
-	mov    r25, r02                                                               $\
+	mov    r25, rC2                                                               $\
 	                                                                              $\
 __printf_done:                                                                  $\
-	cpse   r16, r00                                                               $\
+	cpse   r16, rC0                                                               $\
 	rcall  __printf_serial_write ; print any remaining chars                      $\
 	                                                                              $\
 	; when printing from RAM, the user buffer may not be used after exiting so    $\
 	; we need to wait with exiting until we are done using it.                    $\
-	cpse   r08, r00                                                               $\
+	cpse   r08, rC0                                                               $\
 	rcall  serial_wait_tx_complete                                                $\
 	                                                                              $\
 	/*puts(hash)*/                                                                $\
@@ -363,9 +364,9 @@ DEF_LABELED(__printf_serial_write,                                              
 	movw   yl, zl   ; save current position                                       $\
 	movw   zl, xl   ; output buffer start, r16 is already set to len              $\
 	call   serial_wait_tx_complete                                                $\
-	cpse   r08, r01                                                               $\
+	cpse   r08, rC1                                                               $\
 	call   serial_write_rom                                                       $\
-	cpse   r08, r00                                                               $\
+	cpse   r08, rC0                                                               $\
 	call   serial_write_ram                                                       $\
 	movw   zl, yl   ; restore current position                                    $\
 	/*puts(abrackr)*/                                                             $\
@@ -392,16 +393,16 @@ DEF_LABELED(__printf_s,                                                         
 	rcall  _is_ram_addr                                                           $\
 	mov    r21, r25                                                               $\
 	call   serial_wait_tx_complete                                                $\
-	cpse   r21, r01                                                               $\
+	cpse   r21, rC1                                                               $\
 	call   serial_write_rom                                                       $\
-	cpse   r21, r00                                                               $\
+	cpse   r21, rC0                                                               $\
 	call   serial_write_ram                                                       $\
 	                                                                              $\
 	; switch back to normal printing                                              $\
 	andi   r23, BITINV(__printf_conversion_specifier_mask)                        $\
 	movw   zl, xl                                                                 $\
 	ldi    r22, 2         ; Reset format flags for next round.                    $\
-	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
+	mov    r16, rC2       ; Start fresh. There is an inc in __printf_next_char    $\
 	adiw   xl, 1          ; which will overflow r16 to 0 and inc z, but for x     $\
 	rjmp   __printf_next_char ; we have to do it here.                            $\
 )
@@ -422,7 +423,7 @@ DEF_LABELED(__printf_do_format,                                                 
 	ldi    zl, low(2*__printf_arglen_int_lookup)                                  $\
 	ldi    zh, high(2*__printf_arglen_int_lookup)                                 $\
 	add    zl, r25                                                                $\
-	adc    zh, r00                                                                $\
+	adc    zh, rC0                                                                $\
 	lpm    r23, z   ; r23 is the length of the argument                           $\
 	                                                                              $\
 	movw   zl, yl   ; prepare for icall to real printing routine                  $\
@@ -445,20 +446,20 @@ DEF_LABELED(__printf_do_format,                                                 
 	ldi    r24, '0'                                                               $\
 __printf_do_format_skip_leading_zero:                                           $\
 	ld     r25, x+                                                                $\
-	sub    r16, r01                                                               $\
+	sub    r16, rC1                                                               $\
 	cp     r25, r24                                                               $\
 	; ensure we write at least one character, since otherwise we cannot print     $\
 	; 0 itself.                                                                   $\
-	cpse   r16, r00                                                               $\
+	cpse   r16, rC0                                                               $\
 	breq   __printf_do_format_skip_leading_zero                                   $\
 	sbiw   xl, 1                                                                  $\
-	add    r16, r01                                                               $\
+	add    r16, rC1                                                               $\
 	                                                                              $\
 	; write buffer (r16 is set correctly above)                                   $\
 	; at this point xl = current pos, __printf_serial_ preserves z,               $\
 	; and z needs to be restored before exit                                      $\
 	mov    r22, r08       ; r22 is not needed anymore (for this format specifier) $\
-	mov    r08, r01       ; always write from ram (__printf_work_area)            $\
+	mov    r08, rC1       ; always write from ram (__printf_work_area)            $\
 	; r16 must always > 0 here                                                    $\
 	rcall  __printf_serial_write                                                  $\
 	mov    r08, r22                                                               $\
@@ -469,7 +470,7 @@ __printf_do_format_skip_leading_zero:                                           
 	; but xl points at the work area rather than the start of the current seq.    $\
 	movw   xl, zl                                                                 $\
 	ldi    r22, 2         ; Reset format flags for next round.                    $\
-	mov    r16, r02       ; Start fresh. There is an inc in __printf_next_char    $\
+	mov    r16, rC2       ; Start fresh. There is an inc in __printf_next_char    $\
 	adiw   xl, 1          ; which will overflow r16 to 0 and inc z, but for x     $\
 	rjmp   __printf_next_char ; we have to do it here.                            $\
 )
@@ -502,7 +503,7 @@ DEF_LABELED(__printf_d,                                                         
 	; yl already points to (our) arg                                              $\
 	; zl should point to work area                                                $\
 	add    xl, r16                                                                $\
-	adc    xh, r00  ; we will use up this many bytes of the input                 $\
+	adc    xh, rC0  ; we will use up this many bytes of the input                 $\
 	push   xl                                                                     $\
 	push   xh       ; save (updated) original arg ptr                             $\
 	movw   xl, zl   ; x points to current char                                    $\
@@ -520,7 +521,7 @@ DEF_LABELED(__printf_x,                                                         
 	; determine capitals/non-capitals                                             $\
 	movw   zl, xl                                                                 $\
 	ld     r22, z                                                                 $\
-	cpse   r08, r01                                                               $\
+	cpse   r08, rC1                                                               $\
 	lpm    r22, z                                                                 $\
 	subi   r22, 0x0a + '0' + 'x' - 'a'                                            $\
 	                                                                              $\

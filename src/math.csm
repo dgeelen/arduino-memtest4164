@@ -5,6 +5,7 @@
  ******************************************************************************/
 #pragma once
 
+#include "abi.csm"
 #include "utility_macros.csm"
 #include "instructions.csm"
 #include <boost/preprocessor/cat.hpp>
@@ -51,7 +52,7 @@ DEF_LABELED(bin2bcd,                                                            
 	ldi    r24, 4+1       ; input needs to be placed at the 'end' of the scratch, $\
 	sub    r24, r16       ; plus one because SP points to first free byte         $\
 	add    zl, r24                                                                $\
-	adc    zh, r00                                                                $\
+	adc    zh, rC0                                                                $\
 	mov    r24, r16                                                               $\
 __bin2bcd_copy_src:                                                             $\
 	ld     r25, x+                                                                $\
@@ -59,22 +60,22 @@ __bin2bcd_copy_src:                                                             
 	dec    r24                                                                    $\
 	brne   __bin2bcd_copy_src                                                     $\
 	sub    xl, r16       ; restore x                                              $\
-	sbc    xh, r00                                                                $\
+	sbc    xh, rC0                                                                $\
 	                                                                              $\
 	; figure out length of result                                                 $\
 	ldi    zl, low(2*__bin2bcd_dst_bytes_lookup)                                  $\
 	ldi    zh, high(2*__bin2bcd_dst_bytes_lookup)                                 $\
 	add    zl, r16                                                                $\
-	adc    zh, r00                                                                $\
+	adc    zh, rC0                                                                $\
 	lpm    r23, z                                                                 $\
 	                                                                              $\
 	mov    r24, r23                                                               $\
 __bin2bcd_clear_dst:                                                            $\
-	st     y+, r00                                                                $\
+	st     y+, rC0                                                                $\
 	dec    r24                                                                    $\
 	brne   __bin2bcd_clear_dst                                                    $\
 	sub    yl, r23       ; restore y                                              $\
-	sbc    yh, r00                                                                $\
+	sbc    yh, rC0                                                                $\
 	                                                                              $\
 	mov    r22, r16      ; how many bits to process total                         $\
 	lsl    (r22, 3)      ; N*8                                                    $\
@@ -168,7 +169,7 @@ DEF_LABELED(bcd2bin_nibbles,                                                    
 	ldi    zl, low(2*__bin2bcd_dst_nibbles_lookup)                                $\
 	ldi    zh, high(2*__bin2bcd_dst_nibbles_lookup)                               $\
 	add    zl, r16                                                                $\
-	adc    zh, r00                                                                $\
+	adc    zh, rC0                                                                $\
 	lpm    r25, z                                                                 $\
 	                                                                              $\
 	restore_registers(zl, zh)                                                     $\
@@ -188,7 +189,7 @@ DEF_LABELED(bcd2bin_bytes,                                                      
 	ldi    zl, low(2*__bin2bcd_dst_bytes_lookup)                                  $\
 	ldi    zh, high(2*__bin2bcd_dst_bytes_lookup)                                 $\
 	add    zl, r16                                                                $\
-	adc    zh, r00                                                                $\
+	adc    zh, rC0                                                                $\
 	lpm    r25, z                                                                 $\
 	                                                                              $\
 	restore_registers(zl, zh)                                                     $\
@@ -219,10 +220,10 @@ __bcd2ascii:                                                                    
 	; restore X and Y (2 cycles faster than push/pop)                             $\
 	mov    r24, r16                                                               $\
 	sub    xl, r16                                                                $\
-	sbc    xh, r00                                                                $\
+	sbc    xh, rC0                                                                $\
 	lsl    r24                                                                    $\
 	sub    yl, r24                                                                $\
-	sbc    yh, r00                                                                $\
+	sbc    yh, rC0                                                                $\
 	                                                                              $\
 	ret                                                                           $\
 )
@@ -279,8 +280,8 @@ __div_u16_next_bit:                                                             
 	rjmp  __div_u16_next_bit                                                      /* 12.5 */$\
 	                                                                              $\
 __div_u16_done:                                                                 $\
-	eor   r16, r02 ; quotient                                                     $\
-	eor   r17, r02                                                                $\
+	eor   r16, rC2 ; quotient                                                     $\
+	eor   r17, rC2                                                                $\
 	st    z+, r17                                                                 $\
 	st    z+, r16                                                                 $\
 	st    z+, r19  ; remainder                                                    $\
@@ -341,10 +342,10 @@ __div_u32_next_bit:                                                             
 	rjmp  __div_u32_next_bit                                           /* 20.5 */ $\
 	                                                                              $\
 __div_u32_done:                                                                 $\
-	eor   r08, r02 ; quotient                                                     $\
-	eor   r09, r02                                                                $\
-	eor   r10, r02                                                                $\
-	eor   r11, r02                                                                $\
+	eor   r08, rC2 ; quotient                                                     $\
+	eor   r09, rC2                                                                $\
+	eor   r10, rC2                                                                $\
+	eor   r11, rC2                                                                $\
 	st    z+, r11                                                                 $\
 	st    z+, r10                                                                 $\
 	st    z+, r09                                                                 $\

@@ -41,6 +41,7 @@
 
  ******************************************************************************/
 #pragma once
+#include "abi.csm"
 #include "utility_macros.csm"
 #include "libc.csm"
 #include "string_constant.csm"
@@ -77,8 +78,8 @@ DEF_LABELED(m4164_init,                                                       $\
 	sts    __m4164_config+1, zl                                                 $\
 	sts    __m4164_config+0, zh                                                 $\
 	                                                                            $\
-	mov    r24, r00    ; all pins that we want to set                           $\
-	mov    xl, r00     ; xl is mask of all used pins                            $\
+	mov    r24, rC0    ; all pins that we want to set                           $\
+	mov    xl, rC0     ; xl is mask of all used pins                            $\
 	                                                                            $\
 	ldd    r25, z+m4164_config_Din_mask                                         $\
 	or     xl, r25                                                              $\
@@ -100,12 +101,12 @@ DEF_LABELED(m4164_init,                                                       $\
 	                                                                            $\
 	                                                                            $\
 	; set data directions Arduino ports                                         $\
-	out    PINC, r00   ; Make sure PINxn are in known state (otherwise unused)  $\
-	out    PIND, r00   ;                                                        $\
-	out    DDRD, r02   ; Port D is all address lines, which are all outputs     $\
+	out    PINC, rC0   ; Make sure PINxn are in known state (otherwise unused)  $\
+	out    PIND, rC0   ;                                                        $\
+	out    DDRD, rC2   ; Port D is all address lines, which are all outputs     $\
 	in     r25, DDRC                                                            $\
 	mov    r23, xl     ; xl = all used pins                                     $\
-	eor    r23, r02    ; mask unused pins                                       $\
+	eor    r23, rC2    ; mask unused pins                                       $\
 	and    r25, r23    ; unset used pins                                        $\
 	or     r25, r24    ; r24 is all pins except Din and Dout                    $\
 	ldd    r23, z+m4164_config_Din_mask                                         $\
@@ -120,9 +121,9 @@ DEF_LABELED(m4164_init,                                                       $\
 	cli                                                                         $\
 	                                                                            $\
 	; r24 = bits to set, xl = bits used                                         $\
-	out    PORTD, r00  ; address lines to 0                                     $\
+	out    PORTD, rC0  ; address lines to 0                                     $\
 	in     r25, PORTC  ; get current state /* XXX: quantum collapse simavr? */  $\
-	eor    xl, r02     ; xl = bits *not* used                                   $\
+	eor    xl, rC2     ; xl = bits *not* used                                   $\
 	and    r25, xl     ; clear all used bits                                    $\
 	or     r25, r24    ; set bits that need to be set                           $\
 	out    PORTC, r25  ; update                                                 $\
@@ -163,7 +164,7 @@ __m4164_init_RAS_done:                                                        $\
 ; z = address
 ; bit in r16
 DEF_LABELED(m4164_dram_write_bit,                                             $\
-	cp     r00, r16                                                             $\
+	cp     rC0, r16                                                             $\
 	; fall-through intentional                                                  $\
 )
 
@@ -278,9 +279,9 @@ DEF_LABELED(m4164_dram_read_bit,                                              $\
 	; need to convert r25 from control bits to an actual bit value [0,1]        $\
 	ldd    r24, y+m4164_config_Dout_mask                                        $\
 	and    r25, r24                                                             $\
-	cp     r00, r25    ; sets C if r25 != 0                                     $\
+	cp     rC0, r25    ; sets C if r25 != 0                                     $\
 	brcc   __m4164_dram_read_bit_done                                           $\
-	mov    r25, r01                                                             $\
+	mov    r25, rC1                                                             $\
 	                                                                            $\
 __m4164_dram_read_bit_done:                                                   $\
 	; Trp (100ns) and Tcpn (25ns) are covered by function exit                  $\

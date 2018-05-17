@@ -1,0 +1,27 @@
+/******************************************************************************
+
+   ABI rules for the project.
+
+ ******************************************************************************/
+#pragma once
+#include "utility_macros.csm"
+#include <boost/preprocessor/comparison/equal.hpp>
+#include <boost/preprocessor/stringize.hpp>
+
+
+/**
+ * There are a few registers which will always hold a specific value, and must
+ * not be written to (or at least make sure you don't get caught). These
+ * registers thus act as readily available 'constants'.
+ */
+#define rC0 EVAL(SWALLOW r02)
+#define rC1 EVAL(SWALLOW r03)
+#define rC2 EVAL(SWALLOW r04)
+
+/**
+ * Help to enforce non-writability of rC0..RC2
+ */
+#define ___rC_error(x) $ .error BOOST_PP_STRINGIZE(Register x is reserved for ABI use!) $
+#define r02 (___rC_error(r02)) r02
+#define r03 (___rC_error(r03)) r03
+#define r04 (___rC_error(r04)) r04

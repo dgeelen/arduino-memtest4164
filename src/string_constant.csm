@@ -24,6 +24,7 @@
 
  ******************************************************************************/
 #pragma once
+#include "abi.csm"
 #include "utility_macros.csm"
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/logical/compl.hpp>

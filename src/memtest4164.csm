@@ -4,6 +4,7 @@
 .list                    // We DO want to include the following code in our listing ;D
 
 
+#include "abi.csm"
 #include "interrupts.csm"
 
 ISR_SET_HANDLER(ISR_RESET,      main                               )
@@ -50,7 +51,7 @@ main:
 	; Set compare value
 	ldi    r25, 125 ; F_CPU=16Mhz, prescaler=1/256 --> trigger every 2ms
 	out    OCR0A, r25
-	out    OCR0B, r00 ; dont care
+	out    OCR0B, rC0 ; dont care
 	; enable Compare Match A interrupt
 	ldi    r25, (1<<OCIE0A)
 	sts    TIMSK0, r25
@@ -100,7 +101,7 @@ main:
 
 	; wait for a keypress
 loop:
-	mov    r16, r01
+	mov    r16, rC1
 	ldi    zl, low(serial_rx_byte)
 	ldi    zh, high(serial_rx_byte)
 	call   serial_read
@@ -182,8 +183,8 @@ run_next_test:
 	lpm    yl, z
 	adiw   zl, 1
 
-	cp     r00, yl
-	cpc    r00, yh
+	cp     rC0, yl
+	cpc    rC0, yh
 	breq   run_tests_complete
 	inc    r16
 
@@ -206,7 +207,7 @@ load_test_name:
 	movw   zl, yl      ; set address of test
 
 	icall              ; run test
-	cpse   r25, r00    ; 0 = test passed, 1 = test failed
+	cpse   r25, rC0    ; 0 = test passed, 1 = test failed
 	rjmp   run_test_failed
 
 run_test_passed:
@@ -231,7 +232,7 @@ run_test_print:
 	jmp run_next_test
 
 run_tests_complete:
-	cpse   r17, r00
+	cpse   r17, rC0
 	rjmp   run_tests_complete_failed
 
 run_tests_complete_passed:
@@ -527,11 +528,11 @@ __ramtest_adressing_next_addr:
 	cpi    zh, 0
 	brne   __ramtest_adressing_next_addr
 
-	mov    r25, r00
+	mov    r25, rC0
 	rjmp   __ramtest_adressing_done
 
 __ramtest_adressing_fail:
-	mov    r25, r01
+	mov    r25, rC1
 
 __ramtest_adressing_done:
 	restore_registers(r16, zl, zh)
@@ -550,7 +551,7 @@ ramtest_bit_fade:
 	call   ramtest_fill_memory
 	call   ram_test_delay_5m
 	call   ramtest_compare_memory
-	cpse   r25, r00
+	cpse   r25, rC0
 	rjmp   ramtest_bit_fade_fail
 
 	ldi    r16, 0b11111111
@@ -600,7 +601,7 @@ __ramtest_compare_memory_next_byte:
 	cpi    zh, 0
 	brne   __ramtest_compare_memory_next_byte
 
-	mov    r25, r00
+	mov    r25, rC0
 	rjmp   __ramtest_compare_memory_done
 
 __ramtest_compare_memory_unexpected_value:
@@ -615,7 +616,7 @@ __ramtest_compare_memory_unexpected_value:
 	push   r25
 	call   _printf
 	stack_free(6, zl, zh, r25)
-	mov    r25, r01
+	mov    r25, rC1
 
 __ramtest_compare_memory_done:
 	restore_registers(zl, zh)
@@ -632,8 +633,8 @@ ram_test_delay_n:
 	eor    zl, zl                 ;      1       2
 	mov    r25, r16               ;      1       3
 __ram_test_delay_n:
-	sub    zl, r01                ;      1       4
-	sbc    zh, r00                ;      1       5
+	sub    zl, rC1                ;      1       4
+	sbc    zh, rC0                ;      1       5
 	brne   __ram_test_delay_n     ;    1/2       5 + 65534*2 + 1 = 131074
 	dec    r25                    ;
 	brne   __ram_test_delay_n

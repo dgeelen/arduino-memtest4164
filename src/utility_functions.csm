@@ -5,6 +5,7 @@
  ******************************************************************************/
 #pragma once
 
+#include "abi.csm"
 #include "utility_macros.csm"
 
 /**
@@ -18,12 +19,12 @@ __initialise_registers:                                                       $\
 	dec    ZL                                                                   $\
 	brne   __initialise_registers                                               $\
 	                                                                            $\
-	; r00 is always 0x00                                                        $\
-	; r01 is always 0x01                                                        $\
-	; r02 is always 0xff                                                        $\
-	clr    r00 ; skipped by the above loop...                                   $\
-	inc    r01                                                                  $\
-	dec    r02                                                                  $\
+	; rC0 is always 0x00                                                        $\
+	; rC1 is always 0x01                                                        $\
+	; rC2 is always 0xff                                                        $\
+	clr    rC0                                                                  $\
+	inc    rC1                                                                  $\
+	dec    rC2                                                                  $\
 )
 
 
@@ -55,8 +56,8 @@ debug_break_toggle:                                                           $\
 	eor   zl, zl                 ;      1       2                               $\
 	mov   r25, r16               ;      1       3                               $\
 debug_break_wait:                                                             $\
-	sub   zl, r01                ;      1       4                               $\
-	sbc   zh, r00                ;      1       5                               $\
+	sub   zl, rC1                ;      1       4                               $\
+	sbc   zh, rC0                ;      1       5                               $\
 	brne  debug_break_wait       ;    1/2       5 + 65534*2 + 1 = 131074        $\
 	dec   r25                    ;                                              $\
 	brne  debug_break_wait                                                      $\

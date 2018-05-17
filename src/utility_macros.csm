@@ -13,6 +13,7 @@
  ******************************************************************************/
 #pragma once
 
+#include "abi.csm"
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/comparison/equal.hpp>
@@ -534,6 +535,16 @@ III_ISEMPTY(                                                               \
  * Swallows all arguments passed to it
  */
 #define SWALLOW(...)
+
+
+/**
+ * Forces re-evaluation of its contents.
+ *
+ * E.g. when you have three macro's F, G, and H, where F expands to H, G
+ * expands to (), and H expands to RESULT, the end result of F G would be H ().
+ * Using EVAL(F G), the result will be the expected RESULT.
+ */
+#define EVAL(...) __VA_ARGS__
 
 
 /**

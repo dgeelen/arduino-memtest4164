@@ -5,6 +5,7 @@
  ******************************************************************************/
 #pragma once
 
+#include "abi.csm"
 #include "utility_macros.csm"
 #include <boost/preprocessor/comparison/equal.hpp>
 #include <boost/preprocessor/comparison/greater.hpp>
