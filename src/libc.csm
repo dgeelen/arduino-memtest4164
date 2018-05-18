@@ -28,6 +28,22 @@
 
 
 ////////////////////////////////////////////////////////////////////////////////
+
+#define libc_config(                                                             \
+	write_rom,                                                                     \
+	write_ram,                                                                     \
+	write_wait_complete                                                            \
+)                                                                                \
+	.define __libc_config_write_rom             write_rom                         $\
+	.define __libc_config_write_ram             write_ram                         $\
+	.define __libc_config_write_wait_complete   write_wait_complete               $\
+// ssd1306_config
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
 #define SAVE_Z_REG_AND_LOAD_x SAVE_Z_REG_AND_LOAD(x)
 #define SAVE_Z_REG_AND_LOAD_y SAVE_Z_REG_AND_LOAD(y)
 #define SAVE_Z_REG_AND_LOAD_z
@@ -100,8 +116,8 @@ __is_rom_addr:                                                                  
 ;   z: buffer
 ; r16: buffer length           ; XXX: switch rom/ram
 DEF_LABELED(_puts,                                                              $\
-	call  serial_wait_tx_complete                                                 $\
-	call  serial_write_rom                                                        $\
+	call  __libc_config_write_wait_complete                                       $\
+	call  __libc_config_write_rom                                                 $\
 	ret ; XXX: puts should add a newline                                          $\
 )
 #define puts(x)                                                                 $\
@@ -249,7 +265,7 @@ __printf_start:                                                                 
 	; it is the conversion specifier introductory character,                      $\
 	; output current buffer and switch to conversion specifier mode               $\
 	cpse   r16, rC0                                                               $\
-	rcall  __printf_serial_write                                                  $\
+	rcall  __printf_write                                                         $\
 	ori    r23, __printf_conversion_specifier_mask                                $\
 	movw   xl, zl   ; remember start position (xl points at '%')                  $\
 	mov    r16, rC0 ; updated in __printf_next_char                               $\
@@ -338,12 +354,12 @@ __printf_ret_error:                                                             
 	                                                                              $\
 __printf_done:                                                                  $\
 	cpse   r16, rC0                                                               $\
-	rcall  __printf_serial_write ; print any remaining chars                      $\
+	rcall  __printf_write ; print any remaining chars                             $\
 	                                                                              $\
 	; when printing from RAM, the user buffer may not be used after exiting so    $\
 	; we need to wait with exiting until we are done using it.                    $\
 	cpse   r08, rC0                                                               $\
-	rcall  serial_wait_tx_complete                                                $\
+	rcall  __libc_config_write_wait_complete                                      $\
 	                                                                              $\
 	/*puts(hash)*/                                                                $\
 	restore_registers(                                                            \
@@ -359,15 +375,15 @@ __printf_done:                                                                  
 ; len should be in r16 already
 ; saves z
 ; clobbers y
-DEF_LABELED(__printf_serial_write,                                              $\
+DEF_LABELED(__printf_write,                                                     $\
 	/*puts(abrackl)*/                                                             $\
 	movw   yl, zl   ; save current position                                       $\
 	movw   zl, xl   ; output buffer start, r16 is already set to len              $\
-	call   serial_wait_tx_complete                                                $\
+	call   __libc_config_write_wait_complete                                      $\
 	cpse   r08, rC1                                                               $\
-	call   serial_write_rom                                                       $\
+	call   __libc_config_write_rom                                                $\
 	cpse   r08, rC0                                                               $\
-	call   serial_write_ram                                                       $\
+	call   __libc_config_write_ram                                                $\
 	movw   zl, yl   ; restore current position                                    $\
 	/*puts(abrackr)*/                                                             $\
 	ret                                                                           $\
@@ -392,11 +408,11 @@ DEF_LABELED(__printf_s,                                                         
 	                                                                              $\
 	rcall  _is_ram_addr                                                           $\
 	mov    r21, r25                                                               $\
-	call   serial_wait_tx_complete                                                $\
+	call   __libc_config_write_wait_complete                                      $\
 	cpse   r21, rC1                                                               $\
-	call   serial_write_rom                                                       $\
+	call   __libc_config_write_rom                                                $\
 	cpse   r21, rC0                                                               $\
-	call   serial_write_ram                                                       $\
+	call   __libc_config_write_ram                                                $\
 	                                                                              $\
 	; switch back to normal printing                                              $\
 	andi   r23, BITINV(__printf_conversion_specifier_mask)                        $\
@@ -431,7 +447,7 @@ DEF_LABELED(__printf_do_format,                                                 
 	lds    yh, __printf_arg_ptr+0                                                 $\
 	                                                                              $\
 	; We are about to (re)use the (shared) __printf_work_area                     $\
-	call   serial_wait_tx_complete                                                $\
+	call   __libc_config_write_wait_complete                                      $\
 	                                                                              $\
 	icall  ; do actual formatting                                                 $\
 	                                                                              $\
@@ -442,7 +458,7 @@ DEF_LABELED(__printf_do_format,                                                 
 	; find start of output (skip leading 0s)                                      $\
 	movw   zl, xl         ; restore z                                             $\
 	ldi    xl, low(__printf_work_area)                                            $\
-	ldi    xh, high(__printf_work_area) ; __printf_serial_write needs ptr in x    $\
+	ldi    xh, high(__printf_work_area) ; __printf_write needs ptr in x           $\
 	ldi    r24, '0'                                                               $\
 __printf_do_format_skip_leading_zero:                                           $\
 	ld     r25, x+                                                                $\
@@ -456,12 +472,12 @@ __printf_do_format_skip_leading_zero:                                           
 	add    r16, rC1                                                               $\
 	                                                                              $\
 	; write buffer (r16 is set correctly above)                                   $\
-	; at this point xl = current pos, __printf_serial_ preserves z,               $\
+	; at this point xl = current pos, z is preserved,                             $\
 	; and z needs to be restored before exit                                      $\
 	mov    r22, r08       ; r22 is not needed anymore (for this format specifier) $\
 	mov    r08, rC1       ; always write from ram (__printf_work_area)            $\
 	; r16 must always > 0 here                                                    $\
-	rcall  __printf_serial_write                                                  $\
+	rcall  __printf_write                                                         $\
 	mov    r08, r22                                                               $\
 	                                                                              $\
 	; switch back to normal printing                                              $\

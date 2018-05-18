@@ -35,6 +35,12 @@ main:
 
 	initialise_registers()
 
+	libc_config(
+		serial_write_rom,
+		serial_write_ram,
+		serial_wait_tx_complete
+	)
+
 	serial_init(115200, N, 8, 1)
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
