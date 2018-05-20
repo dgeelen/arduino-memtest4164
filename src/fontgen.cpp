@@ -267,7 +267,7 @@ int main(const int argc, const char* argv[]) try {
 	// Glyph data starts after the list of table pointers (table 1), and the map
 	// of ascii to table-index (table 2).
 	std::size_t table_start_offset = glyph_tables.size()*2 +
-	                                 std::ceil(((last_glyph-first_glyph+1)*(n_table_bits+n_index_bits))/8);
+	                                 ((last_glyph-first_glyph+1)*(n_table_bits+n_index_bits)+7)/8;
 	for(const auto& table : glyph_tables) {
 		if(table->glyph_width != 0) {
 			glyph_width_table.data.push_back("low(FLASH_ADDR(__ssd1306_font_data) + " + to_hex<std::uint16_t>(table_start_offset) + ")");
