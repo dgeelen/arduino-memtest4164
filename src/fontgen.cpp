@@ -315,6 +315,8 @@ int main(const int argc, const char* argv[]) try {
 				table->glyphs.end(),
 				e.second)
 			);
+		assert(index < 256);
+		assert(nth_table < 256);
 		packed = (packed << (n_index_bits+n_table_bits)) | (index << n_table_bits) | (nth_table << 0);
 		bits_in_pack += n_index_bits+n_table_bits;
 		if(e.first == 'A') {
