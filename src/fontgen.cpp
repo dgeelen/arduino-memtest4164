@@ -288,7 +288,7 @@ int main(const int argc, const char* argv[]) try {
 	 ** Map ascii characters to glyph (table and index-in-table)              **
 	 ***************************************************************************/
 	std::map<char, Glyph> ascii_order_glyph_map;
-	for(std::uint8_t ascii = first_glyph; ascii < last_glyph; ++ascii) {
+	for(std::uint8_t ascii = first_glyph; ascii < last_glyph+1; ++ascii) {
 		auto glyph = std::find_if(fnt.glyphs().begin(), fnt.glyphs().end(), [=](const auto& glyph) {
 			return glyph.character() == ascii;
 		});
