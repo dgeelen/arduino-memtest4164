@@ -412,23 +412,24 @@ int main(const int argc, const char* argv[]) try {
 	          << "\t;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;" "\n"
 	          << "\t; step 2: determine the table and index into the table"       "\n"
 	          << "\t;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;" "\n"
-	          << "\tlpm    r20, z+"                                               "\n"
 	          ;
-	if(n_index_bits + n_table_bits != 8) std::cout
-	          << "\tlpm    r21, z+"                                               "\n";
+	// In the table, bits are stored high--low, index first, then table id
 	if(n_index_bits + n_table_bits > 9) std::cout
 	          << "\tlpm    r22, z+"                                               "\n";
+	if(n_index_bits + n_table_bits != 8) std::cout
+	          << "\tlpm    r21, z+"                                               "\n";
+	std::cout << "\tlpm    r20, z+"                                               "\n";
 	if(n_index_bits + n_table_bits != 8) std::cout
 	          <<                                                                  "\n"
 	          << "\tmov    r24, xh    ; bit offset"                               "\n"
 	          << "\tsubi   r24, -(__ssd1306_font_table_bits+__ssd1306_font_index_bits)"                                                             "\n"
-	          << "\tldi    r23, 8"                                                "\n"
+	          << "\tldi    r23, 16"                                               "\n"
 	          << "\tsub    r23, r24"                                              "\n"
 	          << "\t; r23 = amount to shift right to align table bits"            "\n"
-	          << "\tandi   r23, 0x07"                                             "\n"
+	          << "\tandi   r23, 16-1"                                             "\n"
 	          <<                                                                  "\n"
-	          << "\tmov    r24, r21"                                              "\n"
-	          << "\tmov    r25, r22"                                              "\n"
+	          << "\tmov    r24, r20"                                              "\n"
+	          << "\tmov    r25, r21"                                              "\n"
 	          << "__ssd1306_font_extract_table_bits:"                             "\n"
 	          << "\tcp     r23, rC0"                                              "\n"
 	          << "\tbreq   __ssd1306_font_extract_table_bits_done"                "\n"
@@ -442,12 +443,12 @@ int main(const int argc, const char* argv[]) try {
 	          <<                                                                  "\n"
 	          << "\tmov    r24, xh     ; bit offset"                              "\n"
 	          << "\tsubi   r24, -(__ssd1306_font_index_bits)"                     "\n"
-	          << "\tldi    r23, 8"                                                "\n"
+	          << "\tldi    r23, 16"                                               "\n"
 	          << "\tsub    r23, r24"                                              "\n"
 	          << "\t; r23 = amount to shift right to align index bits"            "\n"
-	          << "\tandi   r23, 0x07"                                             "\n"
+	          << "\tandi   r23, 16-1"                                             "\n"
 	          <<                                                                  "\n"
-	          << "\tmov    r24, r20"                                              "\n"
+	          << "\tmov    r24, r20-"                                              "\n"
 	          << "\tmov    r25, r21"                                              "\n"
 	          << "__ssd1306_font_extract_index_bits:"                             "\n"
 	          << "\tcp     r23, rC0"                                              "\n"
