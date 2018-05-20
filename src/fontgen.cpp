@@ -255,6 +255,10 @@ int main(const int argc, const char* argv[]) try {
 	          << "#define __ssd1306_font_index_bits ("  << to_hex<std::uint8_t>(n_index_bits)        << ")\n"
 	          << "#define __ssd1306_font_index_mask ("  << to_hex<std::uint8_t>((1<<n_index_bits)-1) << ")\n"
 	          << "\n"
+	          // non-existing chars are 2px white space, for which we recycle the
+	          // first two (fake) table entries
+	          << "#define __ssd1306_font_missing_glyph_offset 0\n"
+	          << "#define __ssd1306_font_missing_glyph_width 2\n"
 	          ;
 
 	/***************************************************************************
@@ -378,6 +382,9 @@ int main(const int argc, const char* argv[]) try {
 	          << "\tsubi   r24, __ssd1306_font_first_glyph"                       "\n"
 	          << "\tcpi    r24, __ssd1306_font_last_glyph - __ssd1306_font_first_glyph + 1" "\n"
 	          << "\tbrlo   __ssd1306_font_get_data_ptr_exists"                    "\n"
+	          << "\tldi    zl, low(FLASH_ADDR(__ssd1306_font_data)+__ssd1306_font_missing_glyph_offset)"  "\n"
+	          << "\tldi    zh, high(FLASH_ADDR(__ssd1306_font_data)+__ssd1306_font_missing_glyph_offset)" "\n"
+	          << "\tldi    r25, __ssd1306_font_missing_glyph_width"               "\n"
 	          << "\tret"                                                          "\n"
 	          << "__ssd1306_font_get_data_ptr_exists:"                            "\n"
 	          << "\tsave_registers(r20, r21, r22, r23, xl, xh)"                   "\n"
