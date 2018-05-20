@@ -68,6 +68,8 @@
 #define SSD1306_CMD_SET_PAGE_ADDRESS                      (0x22)
 
 
+#include "fontdef.inc"
+
 
 #define ssd1306_config(                                                          \
 	reset_port,       /* RES */                                                    \
@@ -106,12 +108,11 @@ DEF_LABELED(_ssd1306_cmd,                                                       
 )
 
 
-/*
 ; Write the data byte in r24 to the display as a data byte.
 ; Destroys r24, but preserves r25.
 DEF_LABELED(_ssd1306_data,                                                      $\
+	/* fall-through to __ssd1306_spi_tx intentional */                            $\
 )
-*/
 
 #define ssd1306_data(n) DEF_LABELED(; ssd1306_cmd n,                            $\
 	ldi    r24, n                                                                 $\
@@ -318,4 +319,63 @@ DEF_LABELED(_ssd1306_init,                                                      
 
 #define ssd1306_init() DEF_LABELED(ssd1306_init,                                $\
 	call   _ssd1306_init                                                          $\
+)
+
+
+; r16: buffer length
+;   z: buffer
+DEF_LABELED(ssd1306_write_ram,                                                  $\
+	mov    r24, rC0                                                               $\
+	rjmp   __ssd1306_write                                                        $\
+)
+
+; r16: buffer length
+;   z: buffer
+DEF_LABELED(ssd1306_write_rom,                                                  $\
+	mov    r24, rC1                                                               $\
+	; fallthrough to __ssd1306_write                                              $\
+)
+
+
+
+; r16: buffer length
+;   z: buffer
+DEF_LABELED(__ssd1306_write,                                                    $\
+	save_registers(r16, r20, r21, r22, r23, zl, zh, xl, xh)                       $\
+	                                                                              $\
+	mov    r22, r24                                                               $\
+	mov    r23, r16                                                               $\
+	                                                                              $\
+	inc    r23                                                                    $\
+__ssd1306_write_next_char:                                                      $\
+	dec    r23                                                                    $\
+	breq   __ssd1306_write_done                                                   $\
+	                                                                              $\
+	; load byte from buffer and send                                              $\
+	ld     r16, z                                                                 $\
+	cpse   r22, rC0                                                               $\
+	lpm    r16, z                                                                 $\
+	adiw   zl, 1                                                                  $\
+	                                                                              $\
+	movw   xl, zl                                                                 $\
+	call   __ssd1306_font_get_data_ptr                                            $\
+	mov    r21, r25                                                               $\
+	                                                                              $\
+	inc    r21                                                                    $\
+__ssd1306_write_byte_next:                                                      $\
+	dec    r21                                                                    $\
+	breq   __ssd1306_write_byte_done                                              $\
+	lpm    r24, z+                                                                $\
+	call   _ssd1306_data                                                          $\
+	rjmp   __ssd1306_write_byte_next                                              $\
+	                                                                              $\
+__ssd1306_write_byte_done:                                                      $\
+	ldi    r24, 0                                                                 $\
+	call   _ssd1306_data ; always write a space                                   $\
+	movw   zl, xl                                                                 $\
+	rjmp   __ssd1306_write_next_char                                              $\
+	                                                                              $\
+__ssd1306_write_done:                                                           $\
+	restore_registers(r16, r20, r21, r22, r23, zl, zh, xl, xh)                    $\
+	ret                                                                           $\
 )
