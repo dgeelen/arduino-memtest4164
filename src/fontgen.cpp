@@ -141,9 +141,6 @@ int main(const int argc, const char* argv[]) try {
 				const std::uint8_t c = s->column(col);
 				assert(!(col == s->box().left() || col == s->box().right()) || c != 0);
 				dbt.data.push_back(to_hex(c));
-				if(s->character() == 'A') {
-					std::cerr << "A:" << col << " = " << to_hex(c) << "\n";
-				}
 				//std::cout << '\t' << s.printable_character() << ": " << s.box() << "\n";
 				//break;
 			}
@@ -323,9 +320,6 @@ int main(const int argc, const char* argv[]) try {
 		assert(nth_table < 256);
 		packed = (packed << (n_index_bits+n_table_bits)) | (index << n_table_bits) | (nth_table << 0);
 		bits_in_pack += n_index_bits+n_table_bits;
-		if(e.first == 'A') {
-			std::cerr << "index table: A = " << to_hex<std::uint8_t>(nth_table) << "." << to_hex<std::uint8_t>(index) << "\n";
-		}
 		while(bits_in_pack >= 8) {
 			index_table.data.push_back(to_hex<std::uint8_t>(packed>>(bits_in_pack-8)));
 			bits_in_pack -= 8;
