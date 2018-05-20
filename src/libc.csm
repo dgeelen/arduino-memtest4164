@@ -316,6 +316,12 @@ __printf_length_modifier_l:                                                     
 
 DEF_LABELED(__printf_conversion_format_specifiers,                              $\
 	; see if it is any of the conversion format specifiers                        $\
+__printf_conversion_format_specifier_c:                                         $\
+	ldi    r24, 'c'                                                               $\
+	cpse   r25, r24                                                               $\
+	rjmp   __printf_conversion_format_specifier_s                                 $\
+	rjmp   __printf_c                                                             $\
+	                                                                              $\
 __printf_conversion_format_specifier_s:                                         $\
 	ldi    r24, 's'                                                               $\
 	cpse   r25, r24                                                               $\
@@ -388,6 +394,33 @@ DEF_LABELED(__printf_write,                                                     
 	/*puts(abrackr)*/                                                             $\
 	ret                                                                           $\
 )
+
+; xl points at '%', zl points at 'c'
+; (precision and length modifier is not yet supported)
+DEF_LABELED(__printf_c,                                                         $\
+	; save position                                                               $\
+	movw   xl, zl                                                                 $\
+	                                                                              $\
+	; create pointer to char                                                      $\
+	lds    yl, __printf_arg_ptr+1                                                 $\
+	lds    yh, __printf_arg_ptr+0                                                 $\
+	movw   zl, yl                                                                 $\
+	adiw   yl, 1                                                                  $\
+	sts    __printf_arg_ptr+1, yl ; update arg ptr                                $\
+	sts    __printf_arg_ptr+0, yh ; next argument                                 $\
+	                                                                              $\
+	ldi    r16, 1 ; one char please                                               $\
+	call   __libc_config_write_ram                                                $\
+	                                                                              $\
+	; switch back to normal printing                                              $\
+	andi   r23, BITINV(__printf_conversion_specifier_mask)                        $\
+	movw   zl, xl                                                                 $\
+	ldi    r22, 2         ; Reset format flags for next round.                    $\
+	mov    r16, rC2       ; Start fresh. There is an inc in __printf_next_char    $\
+	adiw   xl, 1          ; which will overflow r16 to 0 and inc z, but for x     $\
+	rjmp   __printf_next_char ; we have to do it here.                            $\
+)
+
 
 ; xl points at '%', zl points at 's'
 ; (precision and length modifier is not yet supported)
