@@ -72,6 +72,8 @@
 
 
 #define ssd1306_config(                                                          \
+	screen_width,                                                                  \
+	screen_height,                                                                 \
 	reset_port,       /* RES */                                                    \
 	reset_pin,                                                                     \
 	command_port,     /* DC  */                                                    \
@@ -81,6 +83,8 @@
 	.define ssd1306_config_reset_pin      reset_pin                               $\
 	.define ssd1306_config_command_port   command_port                            $\
 	.define ssd1306_config_command_pin    command_pin                             $\
+	.define ssd1306_config_screen_width   screen_width                            $\
+	.define ssd1306_config_screen_height  screen_height                           $\
 // ssd1306_config
 
 
@@ -139,9 +143,9 @@ __ssd1306_spi_tx_wait:                                                          
 DEF_LABELED(_ssd1306_clear,                                                     $\
 	save_registers(r16, r17)                                                      $\
 	                                                                              $\
-	ldi    r16, 128 / 8                                                           $\
+	ldi    r16, (ssd1306_config_screen_width + 7) / 8                             $\
 __ssd1306_clear_x:                                                              $\
-	ldi    r17, 64                                                                $\
+	ldi    r17, ssd1306_config_screen_height                                      $\
 __ssd1306_clear_y:                                                              $\
 	call   __ssd1306_spi_tx ; preserves r24                                       $\
 	dec    r17                                                                    $\
@@ -198,7 +202,7 @@ ssd1306_reset_delay_2:                                                          
 	ssd1306_cmd(0x80)                                                             $\
 	                                                                              $\
 	ssd1306_cmd(SSD1306_CMD_SET_MULTIPLEX_RATIO)                                  $\
-	ssd1306_cmd(63)                                                               $\
+	ssd1306_cmd(ssd1306_config_screen_height-1)                                   $\
 	                                                                              $\
 	ssd1306_cmd(SSD1306_CMD_SET_DISPLAY_OFFSET)                                   $\
 	ssd1306_cmd(0x00)                                                             $\
@@ -242,12 +246,12 @@ ssd1306_reset_delay_2:                                                          
 	ssd1306_cmd(SSD1306_CMD_SET_DISPLAY_ON)                                       $\
 	                                                                              $\
 	ssd1306_cmd(SSD1306_CMD_SET_COLUMN_ADDRESS)                                   $\
-	ssd1306_cmd(0)   /* Column start address (0 = reset)                 */       $\
-	ssd1306_cmd(127) /* Column end address (127 = reset = lcd width - 1) */       $\
+	ssd1306_cmd(0)                             /* Column start address */         $\
+	ssd1306_cmd(ssd1306_config_screen_width-1) /* Column end address */           $\
 	                                                                              $\
 	ssd1306_cmd(SSD1306_CMD_SET_PAGE_ADDRESS)                                     $\
 	ssd1306_cmd(0)   /* Page start address (0 = reset) */                         $\
-	ssd1306_cmd(7)   /* Page end address               */                         $\
+	ssd1306_cmd((ssd1306_config_screen_height+7)/8-1)  /* Page end address */     $\
 	                                                                              $\
 	; and clear the screen                                                        $\
 	ssd1306_clear(0x00)                                                           $\
