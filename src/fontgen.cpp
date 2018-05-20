@@ -153,6 +153,14 @@ int main(const int argc, const char* argv[]) try {
 	}
 
 	// This will hold all the tables, in the end
+	// We have three tables:
+	// 1) A list of pointers into flash, to the first data byte of the first
+	//    glyph in a list of the all the data bytes of all glyphs of the same
+	//    width.
+	// 2) A list of table/index pairs, indicating for each ascii value the table
+	//    and index into that table for the glyph corresponding to that ascii
+	//    value.
+	// 3) Several tables of glyph data, one for each glyph width.
 	DBTable font_data;
 
 	/***************************************************************************
@@ -254,6 +262,10 @@ int main(const int argc, const char* argv[]) try {
 	 ***************************************************************************/
 	DBTable glyph_width_table;
 	assert(font_data.data.size() == 0);
+	// table_start_offset is the offset into the final table where the first byte
+	// of the first glyph of a table starts.
+	// Glyph data starts after the list of table pointers (table 1), and the map
+	// of ascii to table-index (table 2).
 	std::size_t table_start_offset = glyph_tables.size()*2 +
 	                                 std::ceil(((last_glyph-first_glyph+1)*(n_table_bits+n_index_bits))/8);
 	for(const auto& table : glyph_tables) {
@@ -264,6 +276,7 @@ int main(const int argc, const char* argv[]) try {
 			table_start_offset += table->glyph_data.data.size();
 		}
 		else {
+			// the 'empty glyph' also doesn't have any entry in the glyph data later on
 			glyph_width_table.data.push_back("0x00");
 			glyph_width_table.data.push_back("0x00");
 		}
