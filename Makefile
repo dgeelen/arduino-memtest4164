@@ -187,9 +187,13 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%$(CPP_SOURCE_EXT)
 # it will later discover that fontgen may have more dependencies...
 $(BUILDDIR)/fontgen: $(BUILDDIR)/fontgen.o $(BUILDDIR)/font.o
 
-$(BUILDDIR)/fontdef.inc: $(BUILDDIR)/fontgen $(SRCDIR)/font.png
+$(BUILDDIR)/font.png: $(SRCDIR)/font.xcf
 	@echo "$(COLOR_CYAN)[ preproces ]$(COLOR_RESET)   Generating $@"
-	@$< $(SRCDIR)/font.png > $@
+	convert "$<" -alpha on -background none -layers flatten PNG32:"$@"
+
+$(BUILDDIR)/fontdef.inc: $(BUILDDIR)/fontgen $(BUILDDIR)/font.png
+	@echo "$(COLOR_CYAN)[ preproces ]$(COLOR_RESET)   Generating $@"
+	@$^ > $@
 
 ################################################################################
 
