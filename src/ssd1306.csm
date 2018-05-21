@@ -76,6 +76,8 @@
 // ssd1306_config
 
 
+; Write the data byte in r24 to the display as a command byte
+; Destroys r24 and r25.
 DEF_LABELED(_ssd1306_cmd,                                                       $\
 	; enable command mode                                                         $\
 	in     r25, ssd1306_config_command_port                                       $\
@@ -99,6 +101,8 @@ DEF_LABELED(_ssd1306_cmd,                                                       
 
 
 /*
+; Write the data byte in r24 to the display as a data byte.
+; Destroys r24, but preserves r25.
 DEF_LABELED(_ssd1306_data,                                                      $\
 )
 */
@@ -109,15 +113,16 @@ DEF_LABELED(_ssd1306_data,                                                      
 )
 
 
-; Transmits the byte in r24 out over SPI, preserves r24
+; Transmits the byte in r24 out over SPI.
+; Destroys r24, but preserves r25.
 DEF_LABELED(__ssd1306_spi_tx,                                                   $\
-	; Start transmission of data (r16)                                            $\
+	; Start transmission of data                                                  $\
 	out    SPDR, r24                                                              $\
 	                                                                              $\
 	; Wait for transmission complete                                              $\
 __ssd1306_spi_tx_wait:                                                          $\
-	in     r25, SPSR                                                              $\
-	sbrs   r25, SPIF                                                              $\
+	in     r24, SPSR                                                              $\
+	sbrs   r24, SPIF                                                              $\
 	rjmp   __ssd1306_spi_tx_wait                                                  $\
 	                                                                              $\
 	ret                                                                           $\
