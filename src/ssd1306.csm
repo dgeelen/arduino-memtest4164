@@ -256,6 +256,12 @@ ssd1306_reset_delay_2:                                                          
 	; and clear the screen                                                        $\
 	ssd1306_clear(0x00)                                                           $\
 	                                                                              $\
+	                                                                              $\
+	; round up initialisation                                                     $\
+	sts    __ssd1306_x_pos, rC0                                                   $\
+	sts    __ssd1306_y_pos, rC0                                                   $\
+	                                                                              $\
+	; done                                                                        $\
 	ret                                                                           $\
 )
 
@@ -365,7 +371,23 @@ __ssd1306_write_next_char:                                                      
 	call   __ssd1306_font_get_data_ptr                                            $\
 	mov    r21, r25                                                               $\
 	                                                                              $\
-	inc    r21                                                                    $\
+	; see if this char will still fit on the current line                         $\
+	inc    r21           ; reserve room for a space                               $\
+	lds    r16, __ssd1306_x_pos                                                   $\
+	add    r16, r21                                                               $\
+	cpi    r16, ssd1306_config_screen_width                                       $\
+	brlo   __ssd1306_write_char_fits_on_line                                      $\
+	breq   __ssd1306_write_char_fits_on_line_exact                                $\
+	call   __ssd1306_carriage_return                                              $\
+	call   __ssd1306_line_feed                                                    $\
+	rjmp   __ssd1306_write_byte_next ; cr and lf reset x and y pos                $\
+	                                                                              $\
+__ssd1306_write_char_fits_on_line_exact:                                        $\
+	mov    r16, rC2      ; mark end-of-line for proper wrapping behaviour         $\
+	                     ; x pos will be fixed after writing the glyph            $\
+__ssd1306_write_char_fits_on_line:                                              $\
+	sts    __ssd1306_x_pos, r16                                                   $\
+	                                                                              $\
 __ssd1306_write_byte_next:                                                      $\
 	dec    r21                                                                    $\
 	breq   __ssd1306_write_byte_done                                              $\
@@ -377,6 +399,11 @@ __ssd1306_write_byte_done:                                                      
 	ldi    r24, 0                                                                 $\
 	call   _ssd1306_data ; always write a space                                   $\
 	movw   zl, xl                                                                 $\
+	cpse   r16, rC2      ; reset xpos when we are at the end of the line          $\
+	rjmp   __ssd1306_write_next_char                                              $\
+	                                                                              $\
+	call   __ssd1306_carriage_return                                              $\
+	call   __ssd1306_line_feed                                                    $\
 	rjmp   __ssd1306_write_next_char                                              $\
 	                                                                              $\
 __ssd1306_write_done:                                                           $\
@@ -403,4 +430,71 @@ DEF_LABELED(_ssd1306_set_cursor_pos,                                            
 	ssd1306_cmd((ssd1306_config_screen_height+7)/8)  /* Page end address */       $\
 	                                                                              $\
 	ret                                                                           $\
+)
+
+
+DEF_LABELED(__ssd1306_carriage_return,                                          $\
+	sts    __ssd1306_x_pos, rC0                                                   $\
+	ssd1306_cmd(SSD1306_CMD_SET_COLUMN_ADDRESS)                                   $\
+	ssd1306_cmd(0)                             /* Column start address */         $\
+	ssd1306_cmd(ssd1306_config_screen_width-1) /* Column end address */           $\
+	ret                                                                           $\
+)
+
+
+DEF_LABELED(__ssd1306_line_feed,                                                $\
+	save_registers(r16, r17, r23)                                                 $\
+	lds    r23, __ssd1306_y_pos                                                   $\
+	inc    r23                                                                    $\
+	ldi    r24, 2*(ssd1306_config_screen_height/8) ; 0..height is no-scroll,      $\
+	ldi    r25, ssd1306_config_screen_height/8     ; > height is scroll           $\
+	cpse   r23, r24      ; end reached, back to line 0                            $\
+	mov    r25, r23                                                               $\
+	mov    r23, r25      ; r23 is either line 0 or y+1                            $\
+	sts    __ssd1306_y_pos, r23                                                   $\
+	                                                                              $\
+	lds    r16, __ssd1306_x_pos                                                   $\
+	mov    r17, r23                                                               $\
+	cpi    r23, ssd1306_config_screen_height/8                                    $\
+	brlo   __ssd1306_newline_set_cursor                                           $\
+	                                                                              $\
+	; compute the display start line                                              $\
+	; 0..7 needs no scroll, but 8 needs 1                                         $\
+	; here we know height/8 <= r23 < 2*height/8                                   $\
+	ldi    r25, ssd1306_config_screen_height/8-1                                  $\
+	sub    r23, r25                                                               $\
+	and    r23, r25                                                               $\
+	lsl    r23           ; x2                                                     $\
+	lsl    r23           ; x4                                                     $\
+	lsl    r23           ; x8                                                     $\
+	ldi    r24, SSD1306_CMD_SET_DISPLAY_START_LINE                                $\
+	or     r24, r23                                                               $\
+	call   _ssd1306_cmd                                                           $\
+	                                                                              $\
+	mov    r23, r16                                                               $\
+	mov    r16, rC0      ; r23 wil keep x safe while we move to column 0          $\
+	call   _ssd1306_set_cursor_pos                                                $\
+	                                                                              $\
+	ldi    r25, ssd1306_config_screen_width                                       $\
+__ssd1306_newline_erase:                                                        $\
+	ldi    r24, 0                                                                 $\
+	call   _ssd1306_data ; destroys r24, preserves r25                            $\
+	dec    r25                                                                    $\
+	brne   __ssd1306_newline_erase                                                $\
+	                                                                              $\
+	mov    r16, r23      ; restore x                                              $\
+__ssd1306_newline_set_cursor:                                                   $\
+	call   _ssd1306_set_cursor_pos                                                $\
+	                                                                              $\
+__ssd1306_newline_done:                                                         $\
+	restore_registers(r16, r17, r23)                                              $\
+	ret                                                                           $\
+)
+
+
+DEF_LABELED(__ssd1306_variables,                                                $\
+	.dseg                                                                         $\
+__ssd1306_x_pos: .byte 1 ;                                                      $\
+__ssd1306_y_pos: .byte 1 ;                                                      $\
+	.cseg
 )
