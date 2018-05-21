@@ -22,6 +22,8 @@
 #pragma once
 #include "abi.csm"
 #include "utility_macros.csm"
+#include "math.csm"
+#include "string_constant.csm"
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/preprocessor/seq/cat.hpp>
 #include <boost/preprocessor/seq/cat.hpp>
