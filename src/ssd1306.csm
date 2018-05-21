@@ -310,16 +310,21 @@ DEF_LABELED(_ssd1306_init,                                                      
 	andi   r25, (1<<PRSPI)                                                        $\
 	sts    PRR, r25                                                               $\
 	                                                                              $\
-	; Enable SPI, Master, set clock rate fck/16                                   $\
+	; Enable SPI, Master, set clock rate Fosc/2                                   $\
 	ldi    r25, (0<<SPIE)|                                                         \
 	            (1<<SPE )|                                                         \
 	            (0<<DORD)|                                                         \
 	            (1<<MSTR)|                                                         \
 	            (0<<CPOL)|                                                         \
 	            (0<<CPHA)|                                                         \
-	            (1<<SPR1)|                                                         \
-	            (1<<SPR0)                                                         $\
+	            (0<<SPR1)|                                                         \
+	            (0<<SPR0)                                                         $\
 	out    SPCR, r25                                                              $\
+	                                                                              $\
+	; Set clock rate Fosc/2 (part2)                                               $\
+	in     r25, SPSR                                                              $\
+	ori    r25, 1<<SPI2X                                                          $\
+	out    SPSR, r25                                                              $\
 	                                                                              $\
 	; actual chip initialisation                                                  $\
 	call   ssd1306_reset                                                          $\
