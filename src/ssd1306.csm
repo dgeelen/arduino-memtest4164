@@ -367,6 +367,19 @@ __ssd1306_write_next_char:                                                      
 	lpm    r16, z                                                                 $\
 	adiw   zl, 1                                                                  $\
 	                                                                              $\
+	; see if it is a special character                                            $\
+__ssd1306_write_special_lf:                                                     $\
+	cpi    r16, STRING_CONSTANT_LINE_FEED                                         $\
+	brne   __ssd1306_write_special_cr                                             $\
+	call   __ssd1306_line_feed                                                    $\
+	rjmp   __ssd1306_write_next_char                                              $\
+__ssd1306_write_special_cr:                                                     $\
+	cpi    r16, STRING_CONSTANT_CARRIAGE_RETURN                                   $\
+	brne   __ssd1306_write_not_special                                            $\
+	call   __ssd1306_carriage_return                                              $\
+	rjmp   __ssd1306_write_next_char                                              $\
+__ssd1306_write_not_special:                                                    $\
+	                                                                              $\
 	movw   xl, zl                                                                 $\
 	call   __ssd1306_font_get_data_ptr                                            $\
 	mov    r21, r25                                                               $\
