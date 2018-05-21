@@ -383,3 +383,24 @@ __ssd1306_write_done:                                                           
 	restore_registers(r16, r20, r21, r22, r23, zl, zh, xl, xh)                    $\
 	ret                                                                           $\
 )
+
+
+; set the cursor to the given x/y coordinates
+; x: r16
+; y: r17
+DEF_LABELED(_ssd1306_set_cursor_pos,                                            $\
+	sts    __ssd1306_x_pos, r16                                                   $\
+	sts    __ssd1306_y_pos, r17                                                   $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_COLUMN_ADDRESS)                                   $\
+	mov    r24, r16                                                               $\
+	call   _ssd1306_cmd                                                           $\
+	ssd1306_cmd(ssd1306_config_screen_width-1) /* Column end address */           $\
+	                                                                              $\
+	ssd1306_cmd(SSD1306_CMD_SET_PAGE_ADDRESS)                                     $\
+	mov    r24, r17                                                               $\
+	call   _ssd1306_cmd                                                           $\
+	ssd1306_cmd((ssd1306_config_screen_height+7)/8)  /* Page end address */       $\
+	                                                                              $\
+	ret                                                                           $\
+)
