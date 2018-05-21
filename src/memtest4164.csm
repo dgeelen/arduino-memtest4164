@@ -8,21 +8,17 @@
 #include "interrupts.csm"
 
 ISR_SET_HANDLER(ISR_RESET,      main                               )
-ISR_SET_HANDLER(ISR_USART_RX,   serial_interrupt_handler_rx        )
-ISR_SET_HANDLER(ISR_USART_UDRE, serial_interrupt_handler_data_empty)
 ISR_SET_HANDLER(ISR_TIMER0_COMPA, m4164_interrupt_handler_dram_refresh)
 ISR_SET_ORG_FOR_USER_CODE()
 
 #include <boost/preprocessor/seq/for_each.hpp>
 #include "utility_macros.csm"
 #include "utility_functions.csm"
-#include "serial.csm"
 #include "m4164.csm"
 #include "libc.csm"
 #include "ssd1306.csm"
 
 .dseg
-	serial_rx_byte: .byte 1
 	m4164_config: .byte struct_m4164_config_size
 
 .cseg
@@ -44,8 +40,6 @@ main:
 		ssd1306_write_ram,
 		write_wait_nop
 	)
-
-	serial_init(115200, N, 8, 1)
 
 	ssd1306_config(128, 64, PORTB, PORTB1, PORTB, PORTB2)
 	ssd1306_init()
