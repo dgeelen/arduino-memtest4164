@@ -707,7 +707,7 @@ error_trap:
 
 
 .set string_constants_reserved_space = 512
-.set string_constants_org = (FLASHEND - string_constants_reserved_space + 1)/2
+.set string_constants_org = FLASHEND - (string_constants_reserved_space + 1)/2
 .if string_constants_org < (RAMEND+1)/2
 	.error "String constants must be allocated at a flash address > RAMEND"
 .endif
@@ -723,6 +723,6 @@ STRING_CONSTANT_N(test_result_failed, 67, "%hhd out of %hhd tests failed, this m
 STRING_CONSTANT_N(crlf, 2, STRING_CONSTANT_CRLF);
 
 string_constants_eof:
-.if FLASH_ADDR(string_constants_eof) - 1 > FLASHEND
+.if string_constants_eof > FLASHEND + 1
 	.error "Not enough reserved space to store all string constants (ran out of flash!)"
 .endif
