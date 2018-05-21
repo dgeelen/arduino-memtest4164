@@ -4,6 +4,12 @@
    This driver uses hardware SPI to talk to the display, but the reset and
    data/command toggle lines are user configurable.
 
+   Suggested wiring:
+    - Arduino pin 12 -- SCL                 -- PINB5 / Digital 13
+    - Arduino pin 11 -- SDA                 -- PINB3 / Digital 11
+    - Arduino pin 10 -- DC (command select) -- PINB2 / Digital 10
+    - Arduino pin  9 -- RST (reset)         -- PINB1 / Digital 9
+
  ******************************************************************************/
 #pragma once
 
@@ -204,10 +210,13 @@ ssd1306_reset_delay_2:                                                          
 	ssd1306_cmd(SSD1306_CMD_SET_MEMORY_ADDRESSING_MODE)                           $\
 	ssd1306_cmd(SSD1306_CMD_MEMORY_ADDRESSING_MODE_HORIZONTAL)                    $\
 	                                                                              $\
+	; This flips the screen RTL, this is needed because we flip the screen        $\
 	ssd1306_cmd(SSD1306_CMD_SET_SEGMENT_REMAP_ON)                                 $\
 	                                                                              $\
+	; Flip the screen, so that it is in a more natural reading position           $\
 	ssd1306_cmd(SSD1306_CMD_SET_COM_OUTPUT_SCAN_DIRECTION_REV)                    $\
 	                                                                              $\
+	; The alternative pins configuration seems required to avoid 'interlacing'    $\
 	ssd1306_cmd(SSD1306_CMD_SET_COM_PINS_HARDWARE_CONFIGURATION)                  $\
 	ssd1306_cmd(                                                                   \
 		SSD1306_CMD_COM_PINS_ALTERNATIVE |                                           \
