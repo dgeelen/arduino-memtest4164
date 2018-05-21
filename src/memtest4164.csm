@@ -19,12 +19,16 @@ ISR_SET_ORG_FOR_USER_CODE()
 #include "serial.csm"
 #include "m4164.csm"
 #include "libc.csm"
+#include "ssd1306.csm"
 
 .dseg
 	serial_rx_byte: .byte 1
 	m4164_config: .byte struct_m4164_config_size
 
 .cseg
+
+write_wait_nop:
+	ret
 
 main:
 	; set up the stack
@@ -36,12 +40,15 @@ main:
 	initialise_registers()
 
 	libc_config(
-		serial_write_rom,
-		serial_write_ram,
-		serial_wait_tx_complete
+		ssd1306_write_rom,
+		ssd1306_write_ram,
+		write_wait_nop
 	)
 
 	serial_init(115200, N, 8, 1)
+
+	ssd1306_config(128, 64, PORTB, PORTB1, PORTB, PORTB2)
+	ssd1306_init()
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;;  4164 DRAM setup                                                         ;;
@@ -629,7 +636,7 @@ __ramtest_compare_memory_done:
 	ret
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-STRING_CONSTANT_N(ramtest_compare_memory_badness, 46, " at address 0x%x: expected %hhx, got %hhx --> ")
+STRING_CONSTANT_N(ramtest_compare_memory_badness, 48, STRING_CONSTANT_CRLF, "at address 0x%x:", STRING_CONSTANT_CRLF, "expected %hhx, got %hhx --> ")
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;; Ram test -- delay                                                        ;;
@@ -702,11 +709,11 @@ error_trap:
 
 STRING_CONSTANT_N(welcome_message, 74, "Welcome to the m4164 memory tester v0.1", STRING_CONSTANT_CRLF, "Press any key to begin testing.", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(read_byte, 19, "read byte: '%hhx'", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(running_test, 20, "Running test '%s'...");
+STRING_CONSTANT_N(running_test, 13, "Test: '%s'...");
 STRING_CONSTANT_N(test_passed, 9, " passed", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(test_failed, 9, " FAILED", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(test_result_passed, 72, "All %hhd tests completed successfully, this memory chip seems fine :-)", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(test_result_failed, 67, "%hhd of out %hhd tests failed, this memory chip may be broken :-(", STRING_CONSTANT_CRLF);
+STRING_CONSTANT_N(test_result_failed, 67, "%hhd out of %hhd tests failed, this memory chip may be broken :-(", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(crlf, 2, STRING_CONSTANT_CRLF);
 
 string_constants_eof:
