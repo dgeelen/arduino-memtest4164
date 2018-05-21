@@ -112,12 +112,19 @@ main:
 	call   _printf
 	stack_free(2, r25)
 
-	; wait for a keypress
-loop:
-	mov    r16, rC1
-	ldi    zl, low(serial_rx_byte)
-	ldi    zh, high(serial_rx_byte)
-	call   serial_read
+	; configure PINC5 as input, so we can wait for a keypress
+	in     r25, DDRC
+	andi   r25, BITINV(1<<PINC5)
+	out    DDRC, r25 ; set pin 5 as an input
+	rjmp   wait_for_key_press_done
+wait_for_key_press:
+	in     r25, PINC
+	andi   r25, 1<<PINC5
+	breq   wait_for_key_press
+	ret
+wait_for_key_press_done:
+
+	call   wait_for_key_press
 	jmp run_all_tests
 
 	#define TESTS                                       \
