@@ -227,6 +227,7 @@ load_test_name:
 	movw   zl, yl      ; set address of test
 
 	icall              ; run test
+	push   r25         ; remember the test fail/pass state
 	cpse   r25, rC0    ; 0 = test passed, 1 = test failed
 	rjmp   run_test_failed
 
@@ -247,6 +248,10 @@ run_test_failed:
 run_test_print:
 	call   _printf
 	stack_free(2, r25)
+
+	pop    r25         ; recall test fail/pass state
+	cpse   r25, rC0    ; 0 = test passed, 1 = test failed
+	call   wait_for_key_press
 
 	call   ram_test_delay_long
 	jmp run_next_test
