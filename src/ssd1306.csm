@@ -143,22 +143,24 @@ __ssd1306_spi_tx_wait:                                                          
 DEF_LABELED(_ssd1306_clear,                                                     $\
 	save_registers(r16, r17)                                                      $\
 	                                                                              $\
-	ldi    r16, (ssd1306_config_screen_width + 7) / 8                             $\
-__ssd1306_clear_x:                                                              $\
-	ldi    r17, ssd1306_config_screen_height                                      $\
+	mov    r25, r16  ; clear bit pattern                                          $\
+	ldi    r17, (ssd1306_config_screen_height+7)/8                                $\
 __ssd1306_clear_y:                                                              $\
-	call   __ssd1306_spi_tx ; preserves r24                                       $\
-	dec    r17                                                                    $\
-	brne   __ssd1306_clear_y                                                      $\
+	ldi    r16, ssd1306_config_screen_width                                       $\
+__ssd1306_clear_x:                                                              $\
+	mov    r24, r25                                                               $\
+	call   _ssd1306_data ; preserves r25                                          $\
 	dec    r16                                                                    $\
 	brne   __ssd1306_clear_x                                                      $\
+	dec    r17                                                                    $\
+	brne   __ssd1306_clear_y                                                      $\
 	                                                                              $\
 	restore_registers(r16, r17)                                                   $\
 	ret                                                                           $\
 )                                                                               $\
 
 #define ssd1306_clear(x) DEF_LABELED(; ssd1306_clear,                           $\
-	ldi    r24, x                                                                 $\
+	ldi    r16, x                                                                 $\
 	call   _ssd1306_clear                                                         $\
 )                                                                               $\
 
