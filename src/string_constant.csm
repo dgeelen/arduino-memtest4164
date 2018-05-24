@@ -88,6 +88,7 @@
 ) // STRING_CONSTANT
 
 
+
 /**
  * Creates a zero terminated string, with automatic padding.
  *
@@ -115,6 +116,7 @@
  * Returns the compile-time length of the given string constant.
  */
 #define STRING_CONSTANT_LENGTH(name) CAT_N(string_constant_, name, _len)
+
 
 
 /**
