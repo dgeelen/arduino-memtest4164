@@ -115,6 +115,39 @@
 
 
 /**
+ * Can be used to automatically define a suitable offset (.org) for placing
+ * string constants.
+ */
+#define STRING_CONSTANTS_AUTO_OFFSET()                                           \
+	__string_constants_begin:                                                     $\
+	.if __string_constants_begin < (RAMEND+1)/2                                   $\
+		.set __string_constants_org = (RAMEND+1)/2                                  $\
+	.else                                                                         $\
+		.set __string_constants_org = __string_constants_begin                      $\
+	.endif                                                                        $\
+	.org __string_constants_org                                                   $\
+// STRING_CONSTANTS_AUTO_OFFSET
+
+
+
+/**
+ * All code (string constants) placed inside will automatically be placed at
+ * a suitable offset (.org).
+ */
+#define STRING_CONSTANTS_SECTION(...)                                            \
+	STRING_CONSTANTS_AUTO_OFFSET()                                                $\
+	                                                                               \
+	__VA_ARGS__                                                                   $\
+	                                                                               \
+	__string_constants_end:                                                       $\
+	.if __string_constants_end > FLASHEND + 1                                     $\
+		.error "Not enough reserved space to store all string constants (ran out of flash!)" $\
+	.endif                                                                        $\
+// STRING_CONSTANTS_SECTION(...)
+
+
+
+/**
  * The internal label name of the given string constant.
  *
  * This can be used to get the word address of the string constant in Program

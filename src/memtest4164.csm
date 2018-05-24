@@ -6,6 +6,7 @@
 
 #include "abi.csm"
 #include "interrupts.csm"
+#include "string_constant.csm"
 
 ISR_SET_HANDLER(ISR_RESET,      main                               )
 ISR_SET_HANDLER(ISR_TIMER0_COMPA, m4164_interrupt_handler_dram_refresh)
@@ -706,22 +707,12 @@ error_trap:
 
 
 
-.set string_constants_reserved_space = 512
-.set string_constants_org = FLASHEND - (string_constants_reserved_space + 1)/2
-.if string_constants_org < (RAMEND+1)/2
-	.error "String constants must be allocated at a flash address > RAMEND"
-.endif
-.org string_constants_org
-
-STRING_CONSTANT_N(welcome_message, 74, "Welcome to the m4164 memory tester v0.1", STRING_CONSTANT_CRLF, "Press any key to begin testing.", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(running_test, 13, "Test: '%s'...");
-STRING_CONSTANT_N(test_passed, 9, " passed", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(test_failed, 9, " FAILED", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(test_result_passed, 72, "All %hhd tests completed successfully, this memory chip seems fine :-)", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(test_result_failed, 67, "%hhd out of %hhd tests failed, this memory chip may be broken :-(", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(crlf, 2, STRING_CONSTANT_CRLF);
-
-string_constants_eof:
-.if string_constants_eof > FLASHEND + 1
-	.error "Not enough reserved space to store all string constants (ran out of flash!)"
-.endif
+STRING_CONSTANTS_SECTION(
+	STRING_CONSTANT_N(welcome_message   , 74, "Welcome to the m4164 memory tester v0.1", STRING_CONSTANT_CRLF, "Press any key to begin testing.", STRING_CONSTANT_CRLF);
+	STRING_CONSTANT_N(running_test      , 13, "Test: '%s'...")
+	STRING_CONSTANT_N(test_passed       ,  9, " passed", STRING_CONSTANT_CRLF)
+	STRING_CONSTANT_N(test_failed       ,  9, " FAILED", STRING_CONSTANT_CRLF)
+	STRING_CONSTANT_N(test_result_passed, 72, "All %hhd tests completed successfully, this memory chip seems fine :-)", STRING_CONSTANT_CRLF)
+	STRING_CONSTANT_N(test_result_failed, 67, "%hhd out of %hhd tests failed, this memory chip may be broken :-(", STRING_CONSTANT_CRLF)
+	STRING_CONSTANT_N(crlf              ,  2, STRING_CONSTANT_CRLF)
+)
