@@ -49,6 +49,7 @@
 	     = 2 * STRING_CONSTANT_INTERNAL_LABEL(VARIADIC_HEAD(__VA_ARGS__))         $\
 	.equ STRING_CONSTANT_LENGTH(VARIADIC_HEAD(__VA_ARGS__))                        \
 	     = ARG_COUNT(VARIADIC_TAIL(__VA_ARGS__))                                  $\
+	__STRING_CONSTANT_OFFSET_CHECK(VARIADIC_HEAD(__VA_ARGS__))                    $\
 ) // STRING_CONSTANT
 
 
@@ -85,6 +86,7 @@
 		.error BOOST_PP_STRINGIZE(String constant `VARIADIC_HEAD(__VA_ARGS__)` has   \
 		       unexpected length (VARIADIC_HEAD(VARIADIC_TAIL(__VA_ARGS__))))       $\
 	.endif                                                                        $\
+	__STRING_CONSTANT_OFFSET_CHECK(VARIADIC_HEAD(__VA_ARGS__))                    $\
 ) // STRING_CONSTANT
 
 
@@ -98,6 +100,17 @@
 #define STRING_CONSTANT_ZERO_TERMINATE_00()  , 0    ; zero terminated, no padding needed
 #define STRING_CONSTANT_ZERO_TERMINATE_01()  , 0, 0 ; zero terminated, padded to even no. bytes
 #define STRING_CONSTANT_ZERO_TERMINATE(...) .db VARIADIC_TAIL(__VA_ARGS__) CAT_N(STRING_CONSTANT_ZERO_TERMINATE_, IS_ZERO(VARIADIC_HEAD(__VA_ARGS__)), IS_EVEN(VARIADIC_HEAD(__VA_ARGS__)))()
+
+
+
+/**
+ * Used internally to check string constants can be identified as such by libc.
+ */
+#define __STRING_CONSTANT_OFFSET_CHECK(constant_name)                            \
+	.if STRING_CONSTANT_INTERNAL_LABEL(constant_name) < (RAMEND+1)/2              $\
+		;.error "String constants must be allocated at a flash address > RAMEND. Use e.g. STRING_CONSTANTS_AUTO_OFFSET." $\
+	.endif                                                                         \
+// __STRING_CONSTANT_OFFSET_CHECK
 
 
 
