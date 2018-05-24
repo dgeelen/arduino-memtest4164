@@ -714,7 +714,6 @@ error_trap:
 .org string_constants_org
 
 STRING_CONSTANT_N(welcome_message, 74, "Welcome to the m4164 memory tester v0.1", STRING_CONSTANT_CRLF, "Press any key to begin testing.", STRING_CONSTANT_CRLF);
-STRING_CONSTANT_N(read_byte, 19, "read byte: '%hhx'", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(running_test, 13, "Test: '%s'...");
 STRING_CONSTANT_N(test_passed, 9, " passed", STRING_CONSTANT_CRLF);
 STRING_CONSTANT_N(test_failed, 9, " FAILED", STRING_CONSTANT_CRLF);
